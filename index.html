@@ -238,6 +238,21 @@
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+    /* ── Update banner ── */
+    #update-banner {
+      position: fixed; top: var(--header-h); left: 50%; transform: translateX(-50%) translateY(-8px);
+      width: calc(100% - 32px); max-width: 448px;
+      background: var(--surface2); border: 1px solid var(--success);
+      border-radius: 14px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4); z-index: 50;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s;
+    }
+    #update-banner.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(8px); }
+    #update-banner .update-text { flex: 1; font-size: 13px; color: var(--text); }
+    #update-banner .update-text span { color: var(--muted); font-size: 12px; display: block; margin-top: 1px; }
+    #btn-update-now { padding: 7px 14px; border-radius: 8px; border: none; background: var(--success); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
     /* ── Install banner ── */
     #install-banner {
       position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 8px); left: 50%;
@@ -404,8 +419,8 @@
         <div class="settings-item" id="btn-import-wrap">
           <div><div class="settings-item-label">Import Portfolio</div><div class="settings-item-sub">Restore from JSON file</div></div>
           <span class="settings-arrow">↑</span>
-          <input type="file" id="btn-import" accept=".json" style="position:absolute;opacity:0;inset:0;cursor:pointer">
         </div>
+        <input type="file" id="btn-import" accept=".json" style="display:none">
       </div>
       <div class="settings-section">
         <h3>Danger Zone</h3>
@@ -530,6 +545,15 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- App update banner -->
+<div id="update-banner">
+  <div class="update-text">
+    New version available
+    <span>Tap to reload and apply the update</span>
+  </div>
+  <button id="btn-update-now">Update</button>
+</div>
 
 <!-- Android/Chrome install banner -->
 <div id="install-banner" class="hidden">
@@ -1478,6 +1502,10 @@ document.getElementById('btn-export').addEventListener('click', () => {
   showToast('Portfolio exported');
 });
 
+document.getElementById('btn-import-wrap').addEventListener('click', () => {
+  document.getElementById('btn-import').click();
+});
+
 document.getElementById('btn-import').addEventListener('change', async function() {
   const file = this.files[0];
   if (!file) return;
@@ -1602,7 +1630,34 @@ function showToast(msg) {
 // PWA — INSTALL
 // ═══════════════════════════════════════════
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Show update banner if a new SW is already waiting
+    if (reg.waiting) showUpdateBanner(reg.waiting);
+
+    // New SW found while page is open
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner(sw);
+        }
+      });
+    });
+
+    // After SKIP_WAITING, the controller changes → reload to pick up new cache
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  }).catch(() => {});
+}
+
+function showUpdateBanner(sw) {
+  const banner = document.getElementById('update-banner');
+  banner.classList.add('show');
+  document.getElementById('btn-update-now').addEventListener('click', () => {
+    banner.classList.remove('show');
+    sw.postMessage({ type: 'SKIP_WAITING' });
+  });
 }
 
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
