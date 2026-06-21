@@ -1,4 +1,4 @@
-const CACHE = 'rebalance-v2';
+const CACHE = 'rebalance-v3';
 const STATIC = [
   './',
   './index.html',
@@ -9,13 +9,18 @@ const STATIC = [
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
 ];
 
-// Install: cache static assets, but DON'T skipWaiting automatically.
-// The app will send SKIP_WAITING when the user taps "Update".
+// Install: cache static assets and skip waiting immediately so this
+// SW replaces any older version without requiring a manual update tap.
+// (Future updates from v3 onward will use the SKIP_WAITING message.)
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(STATIC))
+      .then(() => self.skipWaiting())
+  );
 });
 
-// Activate: clear old caches, claim all clients.
+// Activate: wipe every old cache, then claim all open tabs immediately.
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -24,7 +29,7 @@ self.addEventListener('activate', e => {
   );
 });
 
-// The app posts this when the user taps "Update".
+// Future updates: the app posts this when the user taps "Update".
 self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
@@ -36,8 +41,7 @@ self.addEventListener('fetch', e => {
     || url.pathname === '/';
 
   if (isHTML) {
-    // Network-first for HTML: always try to get fresh markup.
-    // Falls back to cache when offline.
+    // Network-first for HTML: always serve fresh markup when online.
     e.respondWith(
       fetch(e.request)
         .then(res => {
@@ -49,7 +53,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for everything else (JS, CSS, fonts, icons).
+  // Cache-first for JS, CSS, fonts, icons.
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
