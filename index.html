@@ -779,6 +779,8 @@ function getColor(map, key) {
 // ═══════════════════════════════════════════
 // YAHOO FINANCE MAPPINGS
 // ═══════════════════════════════════════════
+
+// topHoldings.sectorWeightings keys (snake_case)
 const YAHOO_SECTOR_MAP = {
   technology: 'Technology',
   financial_services: 'Financials',
@@ -791,6 +793,26 @@ const YAHOO_SECTOR_MAP = {
   basic_materials: 'Materials',
   real_estate: 'Real Estate',
   utilities: 'Utilities',
+};
+
+// assetProfile.sector strings (Title Case words from Yahoo)
+const YAHOO_PROFILE_SECTOR_MAP = {
+  'Technology': 'Technology',
+  'Healthcare': 'Healthcare',
+  'Industrials': 'Industrials',
+  'Energy': 'Energy',
+  'Utilities': 'Utilities',
+  'Real Estate': 'Real Estate',
+  'Communication Services': 'Communication Services',
+  'Financial Services': 'Financials',
+  'Consumer Cyclical': 'Consumer Discretionary',
+  'Consumer Defensive': 'Consumer Staples',
+  'Basic Materials': 'Materials',
+  // some tickers return these already-normalized strings:
+  'Financials': 'Financials',
+  'Consumer Discretionary': 'Consumer Discretionary',
+  'Consumer Staples': 'Consumer Staples',
+  'Materials': 'Materials',
 };
 
 const COUNTRY_REGION_MAP = {
@@ -820,68 +842,134 @@ const SECTORS_LIST = [
   'Bonds/Fixed Income','Commodities','Other',
 ];
 
-async function fetchTickerInfo(ticker) {
-  const t = encodeURIComponent(ticker);
-  const chartUrl  = `https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`;
-  const sumUrl    = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${t}?modules=assetProfile,topHoldings`;
-  const proxies   = [
-    u => u,
-    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  ];
+// ── Low-level fetch helpers ──────────────────────────────────────────────────
 
-  for (const proxy of proxies) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 7000);
-      const [chartRes, sumRes] = await Promise.all([
-        fetch(proxy(chartUrl), { signal: ctrl.signal }),
-        fetch(proxy(sumUrl),   { signal: ctrl.signal }),
-      ]);
-      clearTimeout(timer);
+// CORS proxy factories (tried in order, most reliable first)
+const YF_PROXIES = [
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u => u,  // direct last — works on some networks / less strict browsers
+];
 
-      if (!chartRes.ok) continue;
-      const chartJson = await chartRes.json();
-      const meta = chartJson?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) continue;
+// Yahoo Finance rotates between two query hosts; trying both helps hit a warm cache
+const YF_HOSTS = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
 
-      const info = {
-        price: meta.regularMarketPrice,
-        name:  meta.longName || meta.shortName || null,
-        sector: null, region: null,
-        sectorBreakdown: null, regionBreakdown: null,
-      };
+function abortAfter(ms) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(id) };
+}
 
-      if (sumRes.ok) {
-        const sumJson  = await sumRes.json();
-        const result   = sumJson?.quoteSummary?.result?.[0];
-        const profile  = result?.assetProfile;
-        const holdings = result?.topHoldings;
-
-        if (profile?.sector)  info.sector = profile.sector;
-        if (profile?.country) info.region = COUNTRY_REGION_MAP[profile.country] || 'Other';
-
-        // ETF sector weightings
-        if (holdings?.sectorWeightings?.length) {
-          const bd = {};
-          holdings.sectorWeightings.forEach(sw => {
-            Object.entries(sw).forEach(([k, v]) => {
-              const s = YAHOO_SECTOR_MAP[k];
-              if (s && v > 0) bd[s] = +(((bd[s] || 0) + v * 100).toFixed(2));
-            });
-          });
-          if (Object.keys(bd).length) info.sectorBreakdown = bd;
-        }
-
-        // ETF equity region breakdown
-        if (holdings?.equityHoldings) {
-          // Not all funds expose this; skip if missing
-        }
-      }
-      return info;
-    } catch { /* try next proxy */ }
+// Fetch a Yahoo Finance JSON endpoint through all proxies × both hosts.
+// Returns parsed JSON on first success, null if everything fails.
+async function fetchYF(path, timeoutMs = 7000) {
+  for (const proxy of YF_PROXIES) {
+    for (const host of YF_HOSTS) {
+      const url = proxy(`${host}${path}`);
+      const { signal, clear } = abortAfter(timeoutMs);
+      try {
+        const res = await fetch(url, { signal });
+        clear();
+        if (!res.ok) continue;
+        const text = await res.text();
+        // Guard against proxy returning an HTML error page
+        const trimmed = text?.trimStart();
+        if (!trimmed?.startsWith('{') && !trimmed?.startsWith('[')) continue;
+        return JSON.parse(text);
+      } catch { clear(); /* try next */ }
+    }
   }
   return null;
+}
+
+// ── Sector normalisation ─────────────────────────────────────────────────────
+function normaliseProfileSector(raw) {
+  if (!raw) return null;
+  return YAHOO_PROFILE_SECTOR_MAP[raw] ?? raw; // return raw if unmapped (edge case)
+}
+
+function parseSectorWeightings(sectorWeightings) {
+  const bd = {};
+  (sectorWeightings || []).forEach(sw => {
+    Object.entries(sw).forEach(([k, v]) => {
+      const s = YAHOO_SECTOR_MAP[k];
+      if (s && v > 0) bd[s] = +(((bd[s] || 0) + v * 100).toFixed(2));
+    });
+  });
+  return Object.keys(bd).length ? bd : null;
+}
+
+// ── Per-session price cache (avoids duplicate network calls) ─────────────────
+const _infoCache = new Map(); // ticker → { ts, info }
+const CACHE_TTL  = 5 * 60 * 1000; // 5 min
+
+// ── Main entry point ─────────────────────────────────────────────────────────
+async function fetchTickerInfo(ticker) {
+  const key = ticker.toUpperCase();
+
+  // Return cached result if still fresh
+  const cached = _infoCache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.info;
+
+  const t = encodeURIComponent(key);
+  const info = {
+    price: null, name: null,
+    sector: null, region: null,
+    sectorBreakdown: null, regionBreakdown: null,
+  };
+
+  // ── Step 1: price + basic metadata ──────────────────────────────────────
+  // Try v8/chart first (most reliable for price)
+  const chartData = await fetchYF(`/v8/finance/chart/${t}?interval=1d&range=1d`);
+  const meta = chartData?.chart?.result?.[0]?.meta;
+
+  if (meta?.regularMarketPrice) {
+    info.price = meta.regularMarketPrice;
+    info.name  = meta.longName || meta.shortName || null;
+  } else {
+    // Fallback: v7/quote (also returns sector for some tickers)
+    const quoteData = await fetchYF(`/v7/finance/quote?symbols=${t}`);
+    const q = quoteData?.quoteResponse?.result?.[0];
+    if (!q?.regularMarketPrice) {
+      _infoCache.set(key, { ts: Date.now(), info: null });
+      return null;
+    }
+    info.price  = q.regularMarketPrice;
+    info.name   = q.longName || q.shortName || null;
+    if (q.sector) info.sector = normaliseProfileSector(q.sector);
+  }
+
+  // ── Step 2: sector / region enrichment via quoteSummary ─────────────────
+  // Request assetProfile (sector, country) + topHoldings (ETF sector weights)
+  const sumData = await fetchYF(`/v10/finance/quoteSummary/${t}?modules=assetProfile,topHoldings`);
+  const result   = sumData?.quoteSummary?.result?.[0];
+  const profile  = result?.assetProfile;
+  const holdings = result?.topHoldings;
+
+  // Stock sector & region (assetProfile)
+  if (profile?.sector && !info.sector) {
+    info.sector = normaliseProfileSector(profile.sector);
+  }
+  if (profile?.country) {
+    info.region = COUNTRY_REGION_MAP[profile.country] || 'Other';
+  }
+
+  // ETF sector breakdown (topHoldings.sectorWeightings)
+  if (holdings?.sectorWeightings?.length) {
+    info.sectorBreakdown = parseSectorWeightings(holdings.sectorWeightings);
+  }
+
+  // ── Step 3: if quoteSummary failed, try assetProfile alone ──────────────
+  if (!info.sector && !info.sectorBreakdown) {
+    const profileOnly = await fetchYF(`/v10/finance/quoteSummary/${t}?modules=assetProfile`);
+    const p2 = profileOnly?.quoteSummary?.result?.[0]?.assetProfile;
+    if (p2?.sector)  info.sector = normaliseProfileSector(p2.sector);
+    if (p2?.country) info.region = COUNTRY_REGION_MAP[p2.country] || info.region || 'Other';
+  }
+
+  _infoCache.set(key, { ts: Date.now(), info });
+  return info;
 }
 
 // ═══════════════════════════════════════════
