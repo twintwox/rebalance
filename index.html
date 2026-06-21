@@ -334,6 +334,35 @@
     select option { background: #1a1f36; }
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
     ::-webkit-scrollbar { width: 0; }
+
+    /* ── Google Auth ── */
+    .avatar-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border);
+      background: var(--surface2); overflow: hidden; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; color: var(--muted);
+      padding: 0; transition: border-color 0.15s;
+    }
+    .avatar-btn.signed-in { border-color: var(--accent); }
+    .settings-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-family: inherit; font-size: 14px; padding: 10px 14px;
+      outline: none; transition: border-color 0.15s; margin-bottom: 8px;
+    }
+    .settings-input:focus { border-color: var(--accent); }
+    .settings-input::placeholder { color: var(--muted); }
+    .auth-user-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; margin-bottom: 8px;
+    }
+    .auth-user-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .auth-user-info { flex: 1; min-width: 0; }
+    .auth-user-name { font-size: 14px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .auth-user-email { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-signout { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .btn-signout:hover { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+    .gemini-note { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; padding: 0 2px; }
+    .gemini-note.active { color: var(--success); }
   </style>
 </head>
 <body>
@@ -346,6 +375,9 @@
     <div class="header-actions">
       <button class="icon-btn" id="btn-refresh" title="Refresh prices">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+      <button class="avatar-btn" id="header-avatar" title="Google account">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </button>
     </div>
   </header>
@@ -434,6 +466,30 @@
         <div class="settings-item" id="btn-install-settings">
           <div><div class="settings-item-label">Install App</div><div class="settings-item-sub" id="install-settings-sub">Add to home screen for offline use</div></div>
           <span class="settings-arrow">↓</span>
+        </div>
+      </div>
+      <div class="settings-section" id="google-section">
+        <h3>Google &amp; Gemini AI</h3>
+        <!-- Signed-out state -->
+        <div id="auth-signed-out">
+          <input type="text" id="google-client-id" class="settings-input" placeholder="Google OAuth Client ID (from Google Cloud Console)" autocomplete="off">
+          <div class="settings-item" id="btn-google-signin">
+            <div><div class="settings-item-label">Sign in with Google</div><div class="settings-item-sub">Enables Gemini AI for price &amp; sector lookups</div></div>
+            <span class="settings-arrow">→</span>
+          </div>
+          <div class="gemini-note">Sign in so the app can call Gemini using your Google account — no shared API key needed.</div>
+        </div>
+        <!-- Signed-in state -->
+        <div id="auth-signed-in" style="display:none">
+          <div class="auth-user-row">
+            <img class="auth-user-avatar" id="auth-avatar" src="" alt="">
+            <div class="auth-user-info">
+              <div class="auth-user-name" id="auth-name"></div>
+              <div class="auth-user-email" id="auth-email"></div>
+            </div>
+            <button class="btn-signout" id="btn-google-signout">Sign out</button>
+          </div>
+          <div class="gemini-note active">✓ Gemini AI active — lookups now enhanced with AI</div>
         </div>
       </div>
       <div class="settings-section">
@@ -968,8 +1024,11 @@ async function fetchTickerInfo(ticker) {
     if (p2?.country) info.region = COUNTRY_REGION_MAP[p2.country] || info.region || 'Other';
   }
 
-  _infoCache.set(key, { ts: Date.now(), info });
-  return info;
+  // ── Step 4: Gemini enrichment (fills any gaps if user is signed in) ──────
+  const enriched = await enrichWithGemini(key, info);
+
+  _infoCache.set(key, { ts: Date.now(), info: enriched });
+  return enriched;
 }
 
 // ═══════════════════════════════════════════
@@ -1838,11 +1897,218 @@ if (isIOS && !isInStandalone && !localStorage.getItem('iosInstallHintShown')) {
 updateInstallSettingsLabel();
 
 // ═══════════════════════════════════════════
+// GOOGLE AUTH & GEMINI
+// ═══════════════════════════════════════════
+let googleAccessToken = null;
+let googleTokenExpiry = 0;
+let googleUser        = null;
+let _tokenClient      = null;
+let _pendingTokenCb   = null;
+
+function loadGIS() {
+  return new Promise(resolve => {
+    if (window.google?.accounts?.oauth2) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = resolve;
+    s.onerror = resolve; // fail gracefully
+    document.head.appendChild(s);
+  });
+}
+
+async function initTokenClient(clientId) {
+  await loadGIS();
+  if (!window.google?.accounts?.oauth2) return false;
+  _tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'email profile openid https://www.googleapis.com/auth/generative-language',
+    callback: async resp => {
+      const cb = _pendingTokenCb;
+      _pendingTokenCb = null;
+      if (resp.error || !resp.access_token) { cb && cb(null); return; }
+      googleAccessToken = resp.access_token;
+      googleTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000 - 60_000;
+      await fetchGoogleUser();
+      updateAuthUI();
+      cb && cb(googleAccessToken);
+    },
+  });
+  return true;
+}
+
+async function signIn() {
+  const clientId = document.getElementById('google-client-id').value.trim()
+    || localStorage.getItem('gClientId') || '';
+  if (!clientId) { showToast('Paste your Google OAuth Client ID first'); return; }
+  localStorage.setItem('gClientId', clientId);
+  if (!_tokenClient) {
+    const ok = await initTokenClient(clientId);
+    if (!ok) { showToast('Google sign-in unavailable (network?)'); return; }
+  }
+  return new Promise(resolve => {
+    _pendingTokenCb = resolve;
+    _tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
+function signOut() {
+  if (googleAccessToken && window.google?.accounts?.oauth2) {
+    google.accounts.oauth2.revoke(googleAccessToken, () => {});
+  }
+  googleAccessToken = null;
+  googleTokenExpiry = 0;
+  googleUser = null;
+  _tokenClient = null;
+  localStorage.removeItem('gClientId');
+  updateAuthUI();
+  showToast('Signed out from Google');
+}
+
+async function fetchGoogleUser() {
+  if (!googleAccessToken) return;
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${googleAccessToken}` }
+    });
+    if (r.ok) googleUser = await r.json();
+  } catch { /* ignore */ }
+}
+
+function updateAuthUI() {
+  const active = !!(googleAccessToken && Date.now() < googleTokenExpiry);
+
+  document.getElementById('auth-signed-out').style.display = active ? 'none' : '';
+  document.getElementById('auth-signed-in').style.display  = active ? '' : 'none';
+
+  const avatarBtn = document.getElementById('header-avatar');
+  if (active && googleUser?.picture) {
+    avatarBtn.innerHTML = `<img src="${googleUser.picture}" style="width:32px;height:32px;border-radius:50%;object-fit:cover">`;
+    avatarBtn.classList.add('signed-in');
+  } else {
+    avatarBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+    avatarBtn.classList.remove('signed-in');
+  }
+
+  if (active && googleUser) {
+    const img = document.getElementById('auth-avatar');
+    img.src = googleUser.picture || '';
+    img.alt = googleUser.name || '';
+    document.getElementById('auth-name').textContent  = googleUser.name  || '';
+    document.getElementById('auth-email').textContent = googleUser.email || '';
+  }
+
+  // Restore saved client ID into input if not yet filled
+  const saved = localStorage.getItem('gClientId');
+  const inp = document.getElementById('google-client-id');
+  if (saved && !inp.value) inp.value = saved;
+}
+
+// Attempt silent token refresh; returns token or null
+async function ensureToken() {
+  if (googleAccessToken && Date.now() < googleTokenExpiry) return googleAccessToken;
+  const clientId = localStorage.getItem('gClientId');
+  if (!clientId) return null;
+  if (!_tokenClient) {
+    const ok = await initTokenClient(clientId);
+    if (!ok) return null;
+  }
+  return new Promise(resolve => {
+    _pendingTokenCb = resolve;
+    // Silent: no prompt so it resolves quickly if session is live, else null after ~2s
+    _tokenClient.requestAccessToken({ prompt: '' });
+    setTimeout(() => {
+      if (_pendingTokenCb) { _pendingTokenCb(null); _pendingTokenCb = null; }
+    }, 3000);
+  });
+}
+
+// ── Gemini API call ──────────────────────────────────────────────────────────
+async function askGemini(prompt) {
+  const token = await ensureToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0 },
+        }),
+      }
+    );
+    if (res.status === 401) { googleAccessToken = null; return null; }
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text ? JSON.parse(text) : null;
+  } catch { return null; }
+}
+
+// ── Enrich ticker data with Gemini (fills gaps left by Yahoo Finance) ────────
+async function enrichWithGemini(ticker, partial) {
+  if (!(await ensureToken())) return partial; // not signed in
+
+  const needsPrice  = !partial?.price;
+  const needsSector = !partial?.sector && !partial?.sectorBreakdown;
+  const needsRegion = !partial?.region && !partial?.regionBreakdown;
+  if (!needsPrice && !needsSector && !needsRegion) return partial; // nothing to do
+
+  const prompt = `You are a financial data assistant. Return ONLY valid JSON — no markdown, no code fences.
+
+Ticker: ${ticker}
+Data already known (do NOT override these): ${JSON.stringify(partial || {})}
+
+Fill in ONLY the missing fields. Return a JSON object:
+{
+  "price": <current approximate USD price as number, or null>,
+  "name": <full company/fund name as string, or null>,
+  "type": <"stock" or "etf">,
+  "sector": <for stocks: one of [Technology, Financials, Healthcare, Consumer Discretionary, Consumer Staples, Communication Services, Industrials, Energy, Materials, Real Estate, Utilities, Bonds/Fixed Income, Commodities, Other] — null for ETFs>,
+  "sectorBreakdown": <for ETFs: object mapping sector names to percentages summing to 100 — null for stocks>,
+  "region": <for stocks: one of [United States, Europe, Asia Pacific, Emerging Markets, Latin America, Canada, Global, Other] — null for multi-region ETFs>,
+  "regionBreakdown": <for multi-region ETFs: object mapping region names to percentages summing to 100 — null otherwise>
+}`;
+
+  const result = await askGemini(prompt);
+  if (!result || typeof result !== 'object') return partial;
+
+  const m = { ...(partial || {}) };
+  if (!m.price  && result.price)  m.price  = result.price;
+  if (!m.name   && result.name)   m.name   = result.name;
+  if (!m.type   && result.type)   m.type   = result.type;
+  if (!m.sector && !m.sectorBreakdown) {
+    if (result.sector)        m.sector        = result.sector;
+    if (result.sectorBreakdown) m.sectorBreakdown = result.sectorBreakdown;
+  }
+  if (!m.region && !m.regionBreakdown) {
+    if (result.region)        m.region        = result.region;
+    if (result.regionBreakdown) m.regionBreakdown = result.regionBreakdown;
+  }
+  return m;
+}
+
+// ── Auth button wiring ───────────────────────────────────────────────────────
+document.getElementById('btn-google-signin').addEventListener('click', signIn);
+document.getElementById('btn-google-signout').addEventListener('click', signOut);
+document.getElementById('header-avatar').addEventListener('click', () => {
+  // Clicking avatar navigates to settings → Google section
+  switchTab('settings');
+  setTimeout(() => document.getElementById('google-section')
+    .scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+});
+
+// ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 openDB().then(async () => {
   positions = await dbGetAll();
   renderAll();
+  updateAuthUI();
+  // If we have a saved client ID, quietly pre-init the token client
+  const savedId = localStorage.getItem('gClientId');
+  if (savedId) initTokenClient(savedId).catch(() => {});
 });
 </script>
 </body>
