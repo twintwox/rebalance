@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ReBalance</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1f36">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ReBalance">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1f36;
+      --surface2: #232840;
+      --border: #2d3352;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --accent: #4f8ef7;
+      --accent2: #818cf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --header-h: 72px;
+      --tab-h: 64px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; position: relative; }
+    header {
+      height: var(--header-h); padding: 0 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .header-left { display: flex; flex-direction: column; gap: 2px; }
+    .header-logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+    .header-total { font-size: 13px; color: var(--muted); }
+    .header-total span { color: var(--text); font-weight: 600; }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: var(--border); color: var(--text); }
+
+    main { flex: 1; overflow-y: auto; overflow-x: hidden; }
+    .view { display: none; padding: 16px; }
+    .view.active { display: block; }
+
+    /* ── Nav tabs ── */
+    nav.tab-bar {
+      height: calc(var(--tab-h) + var(--safe-b));
+      padding-bottom: var(--safe-b);
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: repeat(4, 1fr);
+    }
+    .tab-btn {
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; font-size: 10px; font-family: inherit; font-weight: 500; transition: color 0.15s;
+    }
+    .tab-btn svg { width: 22px; height: 22px; }
+    .tab-btn.active { color: var(--accent); }
+
+    /* FAB */
+    #fab {
+      position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 16px); right: calc(50% - 240px + 16px);
+      width: 52px; height: 52px; border-radius: 16px;
+      background: var(--accent); border: none; color: #fff; font-size: 26px; line-height: 1;
+      cursor: pointer; box-shadow: 0 4px 20px rgba(79,142,247,0.4);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      z-index: 20;
+    }
+    #fab:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(79,142,247,0.5); }
+
+    @media (max-width: 480px) {
+      #fab { right: 16px; }
+    }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .summary-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+    .summary-card .label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .summary-card .value { font-size: 22px; font-weight: 700; color: var(--text); }
+    .summary-card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Position list ── */
+    .position-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .position-item:hover { border-color: var(--accent); background: var(--surface2); }
+    .pos-row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .pos-ticker { font-size: 16px; font-weight: 700; color: var(--text); }
+    .pos-name { font-size: 12px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .pos-value { font-size: 16px; font-weight: 600; color: var(--text); text-align: right; }
+    .pos-detail { font-size: 12px; color: var(--muted); }
+    .pos-row2 { display: flex; justify-content: space-between; align-items: center; }
+    .pos-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 500; background: var(--surface2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .tag.etf { color: var(--accent); border-color: rgba(79,142,247,0.3); background: rgba(79,142,247,0.08); }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; line-height: 1.5; }
+
+    /* ── Charts ── */
+    .chart-container { position: relative; width: 100%; max-width: 280px; margin: 0 auto 20px; }
+    .chart-center-label {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      text-align: center; pointer-events: none;
+    }
+    .chart-center-label .cl-value { font-size: 20px; font-weight: 700; color: var(--text); }
+    .chart-center-label .cl-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Exposure table ── */
+    .exposure-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    .exposure-table th { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 0 10px; text-align: left; }
+    .exposure-table th:last-child { text-align: right; }
+    .exposure-table td { padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    .exposure-table td:last-child { text-align: right; font-weight: 600; }
+    .exp-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 10px; flex-shrink: 0; }
+    .exp-name-cell { display: flex; align-items: center; }
+    .exp-bar-wrap { margin-top: 4px; height: 3px; background: var(--surface2); border-radius: 2px; width: 100%; }
+    .exp-bar { height: 3px; border-radius: 2px; }
+    .exp-pct { color: var(--muted); font-size: 12px; font-weight: 400; margin-right: 4px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px); z-index: 100; align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-sheet {
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      width: 100%; max-width: 480px; padding: 0 0 calc(20px + var(--safe-b));
+      max-height: 92dvh; overflow-y: auto;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 20px 16px; }
+    .modal-title { font-size: 17px; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; padding: 4px; line-height: 1; }
+
+    /* ── Form ── */
+    .form-body { padding: 0 20px; display: flex; flex-direction: column; gap: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 6px; letter-spacing: 0.3px; }
+    .field input, .field select {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-family: inherit; font-size: 15px; padding: 12px 14px;
+      outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--muted); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+    /* Autocomplete dropdown */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      max-height: 200px; overflow-y: auto; display: none;
+    }
+    .autocomplete-list.open { display: block; }
+    .ac-item {
+      padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:hover { background: var(--surface); }
+    .ac-ticker { font-weight: 600; font-size: 14px; }
+    .ac-name { font-size: 12px; color: var(--muted); text-align: right; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Breakdown table */
+    .breakdown-info {
+      background: rgba(79,142,247,0.08); border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--accent);
+    }
+    .breakdown-info strong { display: block; margin-bottom: 4px; }
+    .breakdown-info span { color: var(--muted); font-size: 12px; }
+
+    /* Form actions */
+    .form-actions { padding: 20px 20px 0; display: flex; gap: 10px; }
+    .btn {
+      flex: 1; padding: 14px; border-radius: 12px; border: none; font-family: inherit;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+
+    /* ── Settings ── */
+    .settings-section { margin-bottom: 24px; }
+    .settings-section h3 { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .settings-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 16px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s;
+    }
+    .settings-item:hover { background: var(--surface2); }
+    .settings-item-label { font-size: 15px; color: var(--text); }
+    .settings-item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .settings-arrow { color: var(--muted); font-size: 18px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 72px); left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      white-space: nowrap; opacity: 0; transition: opacity 0.2s, transform 0.2s;
+      z-index: 200; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Misc ── */
+    .no-data { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+    select option { background: #1a1f36; }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-left">
+      <div class="header-logo">ReBalance</div>
+      <div class="header-total">Total Value: <span id="total-value">$0.00</span></div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-refresh" title="Refresh prices">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Portfolio -->
+    <section id="view-portfolio" class="view active">
+      <div class="summary-row">
+        <div class="summary-card">
+          <div class="label">Positions</div>
+          <div class="value" id="count-positions">0</div>
+          <div class="sub">holdings</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Top Sector</div>
+          <div class="value" id="top-sector" style="font-size:15px">—</div>
+          <div class="sub" id="top-sector-pct"></div>
+        </div>
+      </div>
+      <div id="position-list"></div>
+      <div class="empty-state" id="empty-state">
+        <div class="icon">📊</div>
+        <h3>No positions yet</h3>
+        <p>Tap the + button to add your first stock or index fund.</p>
+      </div>
+      <div style="height:80px"></div>
+    </section>
+
+    <!-- Sectors -->
+    <section id="view-sectors" class="view">
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-container">
+          <canvas id="sector-chart"></canvas>
+          <div class="chart-center-label">
+            <div class="cl-value" id="sector-center-val">—</div>
+            <div class="cl-label">by sector</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="sector-table-wrap">
+        <div class="no-data" id="sector-empty">Add positions to see sector exposure</div>
+      </div>
+      <div style="height:80px"></div>
+    </section>
+
+    <!-- Regions -->
+    <section id="view-regions" class="view">
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-container">
+          <canvas id="region-chart"></canvas>
+          <div class="chart-center-label">
+            <div class="cl-value" id="region-center-val">—</div>
+            <div class="cl-label">by region</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="region-table-wrap">
+        <div class="no-data" id="region-empty">Add positions to see region exposure</div>
+      </div>
+      <div style="height:80px"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="view-settings" class="view">
+      <div class="settings-section">
+        <h3>Data</h3>
+        <div class="settings-item" id="btn-export">
+          <div><div class="settings-item-label">Export Portfolio</div><div class="settings-item-sub">Download as JSON file</div></div>
+          <span class="settings-arrow">↓</span>
+        </div>
+        <div class="settings-item" id="btn-import-wrap">
+          <div><div class="settings-item-label">Import Portfolio</div><div class="settings-item-sub">Restore from JSON file</div></div>
+          <span class="settings-arrow">↑</span>
+          <input type="file" id="btn-import" accept=".json" style="position:absolute;opacity:0;inset:0;cursor:pointer">
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Danger Zone</h3>
+        <div class="settings-item" id="btn-clear" style="border-color:rgba(239,68,68,0.2)">
+          <div><div class="settings-item-label" style="color:var(--danger)">Clear All Data</div><div class="settings-item-sub">Remove all positions permanently</div></div>
+          <span class="settings-arrow" style="color:var(--danger)">✕</span>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>About</h3>
+        <div class="card" style="font-size:13px;color:var(--muted);line-height:1.7">
+          <strong style="color:var(--text)">ReBalance v1.0</strong><br>
+          Portfolio exposure tracker by sector & region.<br>
+          Works offline — all data stored locally on your device.<br><br>
+          <span>Built as a PWA. Install it from your browser's menu.</span>
+        </div>
+      </div>
+      <div style="height:80px"></div>
+    </section>
+  </main>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="portfolio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Portfolio
+    </button>
+    <button class="tab-btn" data-tab="sectors">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+      Sectors
+    </button>
+    <button class="tab-btn" data-tab="regions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Regions
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </nav>
+</div>
+
+<button id="fab">+</button>
+
+<!-- Add / Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add Position</div>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="form-body">
+      <div class="field">
+        <label>Ticker Symbol</label>
+        <div class="autocomplete-wrap">
+          <input type="text" id="f-ticker" placeholder="e.g. AAPL, SPY, VXUS" autocomplete="off" autocapitalize="characters">
+          <div class="autocomplete-list" id="ac-list"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="f-name" placeholder="e.g. Apple Inc.">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Quantity / Shares</label>
+          <input type="number" id="f-qty" placeholder="0" min="0" step="any">
+        </div>
+        <div class="field">
+          <label>Price (USD)</label>
+          <input type="number" id="f-price" placeholder="0.00" min="0" step="any">
+        </div>
+      </div>
+
+      <!-- Single sector/region (stocks & unknown) -->
+      <div id="manual-classification">
+        <div class="field">
+          <label>Sector</label>
+          <select id="f-sector">
+            <option value="">Select sector…</option>
+            <option>Technology</option>
+            <option>Financials</option>
+            <option>Healthcare</option>
+            <option>Consumer Discretionary</option>
+            <option>Consumer Staples</option>
+            <option>Communication Services</option>
+            <option>Industrials</option>
+            <option>Energy</option>
+            <option>Materials</option>
+            <option>Real Estate</option>
+            <option>Utilities</option>
+            <option>Bonds/Fixed Income</option>
+            <option>Commodities</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Region</label>
+          <select id="f-region">
+            <option value="">Select region…</option>
+            <option>United States</option>
+            <option>Europe</option>
+            <option>Asia Pacific</option>
+            <option>Emerging Markets</option>
+            <option>Latin America</option>
+            <option>Canada</option>
+            <option>Global</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ETF multi-breakdown info -->
+      <div id="etf-breakdown-info" style="display:none"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" id="btn-delete" style="display:none">Delete</button>
+      <button class="btn btn-primary" id="btn-save">Save Position</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// STOCK DATABASE
+// ═══════════════════════════════════════════
+const STOCK_DB = {
+  // Top US Stocks
+  AAPL:  { name: 'Apple Inc.', type: 'stock', sector: 'Technology', region: 'United States' },
+  MSFT:  { name: 'Microsoft Corp.', type: 'stock', sector: 'Technology', region: 'United States' },
+  NVDA:  { name: 'NVIDIA Corp.', type: 'stock', sector: 'Technology', region: 'United States' },
+  AMZN:  { name: 'Amazon.com Inc.', type: 'stock', sector: 'Consumer Discretionary', region: 'United States' },
+  GOOGL: { name: 'Alphabet Inc. (Class A)', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  GOOG:  { name: 'Alphabet Inc. (Class C)', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  META:  { name: 'Meta Platforms Inc.', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  TSLA:  { name: 'Tesla Inc.', type: 'stock', sector: 'Consumer Discretionary', region: 'United States' },
+  'BRK.B': { name: 'Berkshire Hathaway B', type: 'stock', sector: 'Financials', region: 'United States' },
+  'BRK.A': { name: 'Berkshire Hathaway A', type: 'stock', sector: 'Financials', region: 'United States' },
+  LLY:   { name: 'Eli Lilly and Co.', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  JPM:   { name: 'JPMorgan Chase & Co.', type: 'stock', sector: 'Financials', region: 'United States' },
+  V:     { name: 'Visa Inc.', type: 'stock', sector: 'Financials', region: 'United States' },
+  XOM:   { name: 'Exxon Mobil Corp.', type: 'stock', sector: 'Energy', region: 'United States' },
+  UNH:   { name: 'UnitedHealth Group Inc.', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  MA:    { name: 'Mastercard Inc.', type: 'stock', sector: 'Financials', region: 'United States' },
+  AVGO:  { name: 'Broadcom Inc.', type: 'stock', sector: 'Technology', region: 'United States' },
+  JNJ:   { name: 'Johnson & Johnson', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  PG:    { name: 'Procter & Gamble Co.', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  HD:    { name: 'Home Depot Inc.', type: 'stock', sector: 'Consumer Discretionary', region: 'United States' },
+  COST:  { name: 'Costco Wholesale Corp.', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  ABBV:  { name: 'AbbVie Inc.', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  BAC:   { name: 'Bank of America Corp.', type: 'stock', sector: 'Financials', region: 'United States' },
+  NFLX:  { name: 'Netflix Inc.', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  KO:    { name: 'Coca-Cola Co.', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  WMT:   { name: 'Walmart Inc.', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  CRM:   { name: 'Salesforce Inc.', type: 'stock', sector: 'Technology', region: 'United States' },
+  AMD:   { name: 'Advanced Micro Devices', type: 'stock', sector: 'Technology', region: 'United States' },
+  ORCL:  { name: 'Oracle Corp.', type: 'stock', sector: 'Technology', region: 'United States' },
+  ADBE:  { name: 'Adobe Inc.', type: 'stock', sector: 'Technology', region: 'United States' },
+  ACN:   { name: 'Accenture PLC', type: 'stock', sector: 'Technology', region: 'United States' },
+  PEP:   { name: 'PepsiCo Inc.', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  MRK:   { name: 'Merck & Co. Inc.', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  TMO:   { name: 'Thermo Fisher Scientific', type: 'stock', sector: 'Healthcare', region: 'United States' },
+  PM:    { name: 'Philip Morris International', type: 'stock', sector: 'Consumer Staples', region: 'United States' },
+  T:     { name: 'AT&T Inc.', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  VZ:    { name: 'Verizon Communications', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  DIS:   { name: 'Walt Disney Co.', type: 'stock', sector: 'Communication Services', region: 'United States' },
+  INTC:  { name: 'Intel Corp.', type: 'stock', sector: 'Technology', region: 'United States' },
+  CSCO:  { name: 'Cisco Systems Inc.', type: 'stock', sector: 'Technology', region: 'United States' },
+  GE:    { name: 'GE Aerospace', type: 'stock', sector: 'Industrials', region: 'United States' },
+  IBM:   { name: 'IBM Corp.', type: 'stock', sector: 'Technology', region: 'United States' },
+  GS:    { name: 'Goldman Sachs Group', type: 'stock', sector: 'Financials', region: 'United States' },
+  MS:    { name: 'Morgan Stanley', type: 'stock', sector: 'Financials', region: 'United States' },
+  WFC:   { name: 'Wells Fargo & Co.', type: 'stock', sector: 'Financials', region: 'United States' },
+  PYPL:  { name: 'PayPal Holdings', type: 'stock', sector: 'Financials', region: 'United States' },
+  UBER:  { name: 'Uber Technologies', type: 'stock', sector: 'Industrials', region: 'United States' },
+  SQ:    { name: 'Block Inc.', type: 'stock', sector: 'Financials', region: 'United States' },
+  SPOT:  { name: 'Spotify Technology', type: 'stock', sector: 'Communication Services', region: 'Europe' },
+  ASML:  { name: 'ASML Holding NV', type: 'stock', sector: 'Technology', region: 'Europe' },
+  SAP:   { name: 'SAP SE', type: 'stock', sector: 'Technology', region: 'Europe' },
+  TSM:   { name: 'Taiwan Semiconductor', type: 'stock', sector: 'Technology', region: 'Asia Pacific' },
+  BABA:  { name: 'Alibaba Group (ADR)', type: 'stock', sector: 'Consumer Discretionary', region: 'Emerging Markets' },
+  BIDU:  { name: 'Baidu Inc. (ADR)', type: 'stock', sector: 'Communication Services', region: 'Emerging Markets' },
+  JD:    { name: 'JD.com Inc. (ADR)', type: 'stock', sector: 'Consumer Discretionary', region: 'Emerging Markets' },
+  PDD:   { name: 'PDD Holdings (ADR)', type: 'stock', sector: 'Consumer Discretionary', region: 'Emerging Markets' },
+  VALE:  { name: 'Vale SA (ADR)', type: 'stock', sector: 'Materials', region: 'Latin America' },
+  PBR:   { name: 'Petrobras (ADR)', type: 'stock', sector: 'Energy', region: 'Latin America' },
+  ITUB:  { name: 'Itaú Unibanco (ADR)', type: 'stock', sector: 'Financials', region: 'Latin America' },
+  SHEL:  { name: 'Shell PLC', type: 'stock', sector: 'Energy', region: 'Europe' },
+  BP:    { name: 'BP PLC', type: 'stock', sector: 'Energy', region: 'Europe' },
+  TTE:   { name: 'TotalEnergies SE', type: 'stock', sector: 'Energy', region: 'Europe' },
+
+  // Broad Market ETFs
+  SPY: { name: 'SPDR S&P 500 ETF', type: 'etf',
+    sectorBreakdown: { Technology:29.3, Financials:13.5, Healthcare:11.8, 'Consumer Discretionary':10.4, 'Communication Services':9.0, Industrials:8.6, 'Consumer Staples':5.9, Energy:3.8, Materials:2.4, 'Real Estate':2.3, Utilities:2.3, Other:0.7 },
+    regionBreakdown: { 'United States':100 } },
+  VOO: { name: 'Vanguard S&P 500 ETF', type: 'etf',
+    sectorBreakdown: { Technology:29.3, Financials:13.5, Healthcare:11.8, 'Consumer Discretionary':10.4, 'Communication Services':9.0, Industrials:8.6, 'Consumer Staples':5.9, Energy:3.8, Materials:2.4, 'Real Estate':2.3, Utilities:2.3, Other:0.7 },
+    regionBreakdown: { 'United States':100 } },
+  IVV: { name: 'iShares Core S&P 500 ETF', type: 'etf',
+    sectorBreakdown: { Technology:29.3, Financials:13.5, Healthcare:11.8, 'Consumer Discretionary':10.4, 'Communication Services':9.0, Industrials:8.6, 'Consumer Staples':5.9, Energy:3.8, Materials:2.4, 'Real Estate':2.3, Utilities:2.3, Other:0.7 },
+    regionBreakdown: { 'United States':100 } },
+  QQQ: { name: 'Invesco QQQ (NASDAQ-100)', type: 'etf',
+    sectorBreakdown: { Technology:49.5, 'Communication Services':16.2, 'Consumer Discretionary':13.0, Healthcare:6.4, Industrials:5.1, 'Consumer Staples':4.4, Financials:2.3, Utilities:1.0, Materials:0.8, Other:1.3 },
+    regionBreakdown: { 'United States':97.5, Other:2.5 } },
+  VTI: { name: 'Vanguard Total Stock Market ETF', type: 'etf',
+    sectorBreakdown: { Technology:27.8, Financials:13.9, Healthcare:12.3, 'Consumer Discretionary':10.2, 'Communication Services':8.4, Industrials:9.2, 'Consumer Staples':5.6, Energy:3.6, Materials:2.5, 'Real Estate':2.8, Utilities:2.6, Other:1.1 },
+    regionBreakdown: { 'United States':100 } },
+  VXUS: { name: 'Vanguard Total International Stock ETF', type: 'etf',
+    sectorBreakdown: { Financials:21.0, Industrials:14.5, Technology:12.5, 'Consumer Discretionary':10.8, Healthcare:8.2, 'Consumer Staples':7.3, Materials:7.0, Energy:5.2, 'Communication Services':5.2, Utilities:3.8, 'Real Estate':3.2, Other:1.3 },
+    regionBreakdown: { Europe:38.5, 'Asia Pacific':32.0, 'Emerging Markets':22.5, 'Latin America':3.5, Canada:2.5, Other:1.0 } },
+  VEA: { name: 'Vanguard FTSE Developed Markets ETF', type: 'etf',
+    sectorBreakdown: { Financials:22.5, Industrials:16.5, Technology:9.5, 'Consumer Discretionary':11.0, Healthcare:9.8, 'Consumer Staples':8.5, Materials:7.5, Energy:4.8, 'Communication Services':4.5, Utilities:3.5, 'Real Estate':2.4, Other:0.9 },
+    regionBreakdown: { Europe:52.0, 'Asia Pacific':40.5, Canada:6.5, Other:1.0 } },
+  VWO: { name: 'Vanguard FTSE Emerging Markets ETF', type: 'etf',
+    sectorBreakdown: { Financials:24.5, Technology:20.5, 'Consumer Discretionary':11.5, Materials:8.5, 'Communication Services':8.0, Energy:6.0, Industrials:6.5, 'Consumer Staples':5.5, Healthcare:3.5, Utilities:3.0, 'Real Estate':2.5, Other:0.5 },
+    regionBreakdown: { 'Emerging Markets':100 } },
+  VT: { name: 'Vanguard Total World Stock ETF', type: 'etf',
+    sectorBreakdown: { Technology:22.0, Financials:15.5, Healthcare:11.0, Industrials:11.0, 'Consumer Discretionary':10.5, 'Communication Services':7.5, 'Consumer Staples':6.0, Energy:4.2, Materials:4.5, 'Real Estate':2.8, Utilities:2.8, Other:2.2 },
+    regionBreakdown: { 'United States':62.0, Europe:15.5, 'Asia Pacific':12.0, 'Emerging Markets':8.0, Canada:1.5, Other:1.0 } },
+  IWM: { name: 'iShares Russell 2000 ETF', type: 'etf',
+    sectorBreakdown: { Industrials:18.5, Healthcare:16.5, Financials:15.0, Technology:12.0, 'Consumer Discretionary':10.5, 'Real Estate':7.0, Energy:6.5, Materials:4.0, 'Consumer Staples':3.5, Utilities:3.5, 'Communication Services':2.5, Other:0.5 },
+    regionBreakdown: { 'United States':100 } },
+
+  // Bond ETFs
+  BND:  { name: 'Vanguard Total Bond Market ETF', type: 'etf', sectorBreakdown: { 'Bonds/Fixed Income':100 }, regionBreakdown: { 'United States':100 } },
+  AGG:  { name: 'iShares Core US Aggregate Bond ETF', type: 'etf', sectorBreakdown: { 'Bonds/Fixed Income':100 }, regionBreakdown: { 'United States':100 } },
+  TLT:  { name: 'iShares 20+ Year Treasury Bond ETF', type: 'etf', sectorBreakdown: { 'Bonds/Fixed Income':100 }, regionBreakdown: { 'United States':100 } },
+  LQD:  { name: 'iShares IG Corp Bond ETF', type: 'etf', sectorBreakdown: { 'Bonds/Fixed Income':100 }, regionBreakdown: { 'United States':78, Europe:12, Other:10 } },
+  BNDW: { name: 'Vanguard Total World Bond ETF', type: 'etf', sectorBreakdown: { 'Bonds/Fixed Income':100 }, regionBreakdown: { 'United States':53, Europe:22, 'Asia Pacific':15, 'Emerging Markets':8, Other:2 } },
+
+  // Sector ETFs
+  XLK:  { name: 'Technology Select Sector SPDR', type: 'etf', sectorBreakdown: { Technology:100 }, regionBreakdown: { 'United States':100 } },
+  XLF:  { name: 'Financial Select Sector SPDR', type: 'etf', sectorBreakdown: { Financials:100 }, regionBreakdown: { 'United States':100 } },
+  XLE:  { name: 'Energy Select Sector SPDR', type: 'etf', sectorBreakdown: { Energy:100 }, regionBreakdown: { 'United States':100 } },
+  XLV:  { name: 'Health Care Select Sector SPDR', type: 'etf', sectorBreakdown: { Healthcare:100 }, regionBreakdown: { 'United States':100 } },
+  XLY:  { name: 'Consumer Discret. Select Sector SPDR', type: 'etf', sectorBreakdown: { 'Consumer Discretionary':100 }, regionBreakdown: { 'United States':100 } },
+  XLP:  { name: 'Consumer Staples Select Sector SPDR', type: 'etf', sectorBreakdown: { 'Consumer Staples':100 }, regionBreakdown: { 'United States':100 } },
+  XLU:  { name: 'Utilities Select Sector SPDR', type: 'etf', sectorBreakdown: { Utilities:100 }, regionBreakdown: { 'United States':100 } },
+  XLB:  { name: 'Materials Select Sector SPDR', type: 'etf', sectorBreakdown: { Materials:100 }, regionBreakdown: { 'United States':100 } },
+  XLI:  { name: 'Industrial Select Sector SPDR', type: 'etf', sectorBreakdown: { Industrials:100 }, regionBreakdown: { 'United States':100 } },
+  XLRE: { name: 'Real Estate Select Sector SPDR', type: 'etf', sectorBreakdown: { 'Real Estate':100 }, regionBreakdown: { 'United States':100 } },
+  XLC:  { name: 'Communication Services Select Sector SPDR', type: 'etf', sectorBreakdown: { 'Communication Services':100 }, regionBreakdown: { 'United States':100 } },
+
+  // Dividend ETFs
+  VYM:  { name: 'Vanguard High Dividend Yield ETF', type: 'etf',
+    sectorBreakdown: { Financials:22.0, Healthcare:13.5, 'Consumer Staples':12.5, Industrials:12.0, Energy:9.5, Technology:10.0, Utilities:6.5, 'Consumer Discretionary':5.5, 'Communication Services':5.0, Materials:2.5, 'Real Estate':1.5 },
+    regionBreakdown: { 'United States':100 } },
+  SCHD: { name: 'Schwab US Dividend Equity ETF', type: 'etf',
+    sectorBreakdown: { Healthcare:17.0, Financials:16.5, 'Consumer Staples':15.0, Industrials:14.5, Technology:12.0, Energy:8.0, 'Consumer Discretionary':5.5, 'Communication Services':5.0, Utilities:3.5, Materials:3.0 },
+    regionBreakdown: { 'United States':100 } },
+  JEPI: { name: 'JPMorgan Equity Premium Income ETF', type: 'etf',
+    sectorBreakdown: { Industrials:14.0, Healthcare:12.5, Technology:12.0, 'Consumer Staples':11.5, Financials:11.0, Utilities:10.5, Energy:7.5, 'Consumer Discretionary':7.5, 'Communication Services':6.5, Materials:4.0, 'Real Estate':3.0 },
+    regionBreakdown: { 'United States':100 } },
+
+  // Commodity ETFs
+  GLD:  { name: 'SPDR Gold Shares ETF', type: 'etf', sectorBreakdown: { Commodities:100 }, regionBreakdown: { Global:100 } },
+  IAU:  { name: 'iShares Gold Trust ETF', type: 'etf', sectorBreakdown: { Commodities:100 }, regionBreakdown: { Global:100 } },
+  SLV:  { name: 'iShares Silver Trust ETF', type: 'etf', sectorBreakdown: { Commodities:100 }, regionBreakdown: { Global:100 } },
+
+  // Thematic
+  ARKK: { name: 'ARK Innovation ETF', type: 'etf',
+    sectorBreakdown: { Technology:45.0, Healthcare:30.0, 'Consumer Discretionary':15.0, Financials:8.0, Other:2.0 },
+    regionBreakdown: { 'United States':88.0, Other:12.0 } },
+};
+
+// ═══════════════════════════════════════════
+// COLORS
+// ═══════════════════════════════════════════
+const SECTOR_COLORS = {
+  'Technology': '#4f8ef7',
+  'Financials': '#22c55e',
+  'Healthcare': '#a78bfa',
+  'Consumer Discretionary': '#f59e0b',
+  'Communication Services': '#14b8a6',
+  'Industrials': '#06b6d4',
+  'Consumer Staples': '#84cc16',
+  'Energy': '#ef4444',
+  'Materials': '#f97316',
+  'Real Estate': '#ec4899',
+  'Utilities': '#8b5cf6',
+  'Bonds/Fixed Income': '#94a3b8',
+  'Commodities': '#fbbf24',
+  'Other': '#6b7280',
+};
+const REGION_COLORS = {
+  'United States': '#4f8ef7',
+  'Europe': '#22c55e',
+  'Asia Pacific': '#f59e0b',
+  'Emerging Markets': '#ef4444',
+  'Latin America': '#f97316',
+  'Canada': '#a78bfa',
+  'Global': '#14b8a6',
+  'Other': '#6b7280',
+};
+function getColor(map, key) {
+  return map[key] || '#' + Math.floor(Math.abs(Math.sin(key.charCodeAt(0)) * 16777215)).toString(16).padStart(6,'0');
+}
+
+// ═══════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════
+let db;
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('rebalanceV1', 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('positions')) d.createObjectStore('positions', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbGetAll() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('positions', 'readonly');
+    const req = tx.objectStore('positions').getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbPut(item) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('positions', 'readwrite');
+    const req = tx.objectStore('positions').put(item);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbDelete(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('positions', 'readwrite');
+    const req = tx.objectStore('positions').delete(id);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbClear() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('positions', 'readwrite');
+    const req = tx.objectStore('positions').clear();
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let positions = [];
+let activeTab = 'portfolio';
+let editingId = null;
+let sectorChartInst = null;
+let regionChartInst = null;
+
+// ═══════════════════════════════════════════
+// COMPUTE EXPOSURE
+// ═══════════════════════════════════════════
+function computeExposure() {
+  let totalValue = 0;
+  const sectors = {}, regions = {};
+
+  positions.forEach(p => {
+    const val = (p.quantity || 0) * (p.price || 0);
+    totalValue += val;
+
+    if (p.type === 'etf' && p.sectorBreakdown && Object.keys(p.sectorBreakdown).length) {
+      Object.entries(p.sectorBreakdown).forEach(([s, pct]) => {
+        sectors[s] = (sectors[s] || 0) + val * pct / 100;
+      });
+    } else {
+      const s = p.sector || 'Other';
+      sectors[s] = (sectors[s] || 0) + val;
+    }
+
+    if (p.type === 'etf' && p.regionBreakdown && Object.keys(p.regionBreakdown).length) {
+      Object.entries(p.regionBreakdown).forEach(([r, pct]) => {
+        regions[r] = (regions[r] || 0) + val * pct / 100;
+      });
+    } else {
+      const r = p.region || 'Other';
+      regions[r] = (regions[r] || 0) + val;
+    }
+  });
+
+  // Sort by value desc
+  const sortedSectors = Object.entries(sectors).sort((a, b) => b[1] - a[1]);
+  const sortedRegions = Object.entries(regions).sort((a, b) => b[1] - a[1]);
+
+  return { totalValue, sectors: sortedSectors, regions: sortedRegions };
+}
+
+// ═══════════════════════════════════════════
+// FORMAT
+// ═══════════════════════════════════════════
+function fmt(n) {
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(2);
+}
+function fmtPct(n) { return n.toFixed(1) + '%'; }
+
+// ═══════════════════════════════════════════
+// RENDER PORTFOLIO
+// ═══════════════════════════════════════════
+function renderPortfolio() {
+  const { totalValue, sectors } = computeExposure();
+  document.getElementById('total-value').textContent = fmt(totalValue);
+  document.getElementById('count-positions').textContent = positions.length;
+
+  const topSector = sectors[0];
+  if (topSector && totalValue > 0) {
+    document.getElementById('top-sector').textContent = topSector[0];
+    document.getElementById('top-sector-pct').textContent = fmtPct(topSector[1] / totalValue * 100);
+  } else {
+    document.getElementById('top-sector').textContent = '—';
+    document.getElementById('top-sector-pct').textContent = '';
+  }
+
+  const list = document.getElementById('position-list');
+  const empty = document.getElementById('empty-state');
+
+  if (positions.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = positions.map(p => {
+    const val = (p.quantity || 0) * (p.price || 0);
+    const pct = totalValue > 0 ? val / totalValue * 100 : 0;
+    const sectorLabel = p.type === 'etf' ? 'Multi-sector' : (p.sector || '—');
+    const regionLabel = p.type === 'etf' ? 'Multi-region' : (p.region || '—');
+    return `<div class="position-item" data-id="${p.id}">
+      <div class="pos-row1">
+        <div>
+          <div class="pos-ticker">${p.ticker}</div>
+          <div class="pos-name">${p.name || ''}</div>
+        </div>
+        <div>
+          <div class="pos-value">${fmt(val)}</div>
+          <div class="pos-detail" style="text-align:right">${fmtPct(pct)} of portfolio</div>
+        </div>
+      </div>
+      <div class="pos-row2">
+        <div class="pos-tags">
+          ${p.type === 'etf' ? '<span class="tag etf">ETF</span>' : ''}
+          <span class="tag">${sectorLabel}</span>
+          <span class="tag">${regionLabel}</span>
+        </div>
+        <div class="pos-detail">${p.quantity} @ $${(p.price||0).toFixed(2)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Attach click handlers
+  list.querySelectorAll('.position-item').forEach(el => {
+    el.addEventListener('click', () => openEditModal(el.dataset.id));
+  });
+}
+
+// ═══════════════════════════════════════════
+// RENDER CHARTS
+// ═══════════════════════════════════════════
+function renderChart(canvasId, data, colorMap, centerElId) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const labels = data.map(d => d[0]);
+  const values = data.map(d => d[1]);
+  const colors = labels.map(l => getColor(colorMap, l));
+  const total = values.reduce((s, v) => s + v, 0);
+
+  document.getElementById(centerElId).textContent = fmt(total);
+
+  const chartData = {
+    labels,
+    datasets: [{ data: values, backgroundColor: colors, borderColor: '#0f1117', borderWidth: 3, hoverBorderWidth: 3 }]
+  };
+
+  const existing = canvasId === 'sector-chart' ? sectorChartInst : regionChartInst;
+  if (existing) existing.destroy();
+
+  const inst = new Chart(ctx, {
+    type: 'doughnut',
+    data: chartData,
+    options: {
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+              return ` ${fmt(ctx.raw)} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (canvasId === 'sector-chart') sectorChartInst = inst;
+  else regionChartInst = inst;
+}
+
+function renderExposureTable(wrapId, emptyId, data, colorMap, totalValue) {
+  const wrap = document.getElementById(wrapId);
+  const empty = document.getElementById(emptyId);
+
+  if (!data.length || totalValue === 0) {
+    wrap.innerHTML = `<div class="no-data" id="${emptyId}">Add positions to see exposure</div>`;
+    return;
+  }
+  if (empty) empty.remove();
+
+  wrap.innerHTML = `<table class="exposure-table">
+    <thead><tr><th>Name</th><th>Value</th><th>Weight</th></tr></thead>
+    <tbody>
+      ${data.map(([name, val]) => {
+        const pct = totalValue > 0 ? val / totalValue * 100 : 0;
+        const color = getColor(colorMap, name);
+        return `<tr>
+          <td>
+            <div class="exp-name-cell">
+              <span class="exp-dot" style="background:${color}"></span>
+              <span>${name}</span>
+            </div>
+            <div class="exp-bar-wrap"><div class="exp-bar" style="width:${pct}%;background:${color}"></div></div>
+          </td>
+          <td>${fmt(val)}</td>
+          <td><span class="exp-pct">${fmtPct(pct)}</span></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderSectors() {
+  const { totalValue, sectors } = computeExposure();
+  if (!sectors.length || totalValue === 0) {
+    document.getElementById('sector-center-val').textContent = '$0';
+    if (sectorChartInst) { sectorChartInst.destroy(); sectorChartInst = null; }
+    document.getElementById('sector-table-wrap').innerHTML = '<div class="no-data">Add positions to see sector exposure</div>';
+    return;
+  }
+  renderChart('sector-chart', sectors, SECTOR_COLORS, 'sector-center-val');
+  renderExposureTable('sector-table-wrap', null, sectors, SECTOR_COLORS, totalValue);
+}
+
+function renderRegions() {
+  const { totalValue, regions } = computeExposure();
+  if (!regions.length || totalValue === 0) {
+    document.getElementById('region-center-val').textContent = '$0';
+    if (regionChartInst) { regionChartInst.destroy(); regionChartInst = null; }
+    document.getElementById('region-table-wrap').innerHTML = '<div class="no-data">Add positions to see region exposure</div>';
+    return;
+  }
+  renderChart('region-chart', regions, REGION_COLORS, 'region-center-val');
+  renderExposureTable('region-table-wrap', null, regions, REGION_COLORS, totalValue);
+}
+
+function renderAll() {
+  renderPortfolio();
+  renderSectors();
+  renderRegions();
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
+  if (tab === 'sectors') renderSectors();
+  if (tab === 'regions') renderRegions();
+}
+
+// ═══════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════
+let currentLookup = null;
+
+function openAddModal() {
+  editingId = null;
+  currentLookup = null;
+  document.getElementById('modal-title').textContent = 'Add Position';
+  document.getElementById('btn-delete').style.display = 'none';
+  clearForm();
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('f-ticker').focus(), 200);
+}
+
+function openEditModal(id) {
+  const p = positions.find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+  currentLookup = null;
+  document.getElementById('modal-title').textContent = 'Edit Position';
+  document.getElementById('btn-delete').style.display = '';
+  fillForm(p);
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('ac-list').classList.remove('open');
+  editingId = null;
+  currentLookup = null;
+}
+
+function clearForm() {
+  ['f-ticker','f-name','f-qty','f-price'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-sector').value = '';
+  document.getElementById('f-region').value = '';
+  document.getElementById('manual-classification').style.display = '';
+  document.getElementById('etf-breakdown-info').style.display = 'none';
+  document.getElementById('etf-breakdown-info').innerHTML = '';
+}
+
+function fillForm(p) {
+  document.getElementById('f-ticker').value = p.ticker || '';
+  document.getElementById('f-name').value = p.name || '';
+  document.getElementById('f-qty').value = p.quantity || '';
+  document.getElementById('f-price').value = p.price || '';
+  if (p.type === 'etf' && p.sectorBreakdown) {
+    showETFBreakdown(p.ticker, p.sectorBreakdown, p.regionBreakdown);
+  } else {
+    document.getElementById('manual-classification').style.display = '';
+    document.getElementById('etf-breakdown-info').style.display = 'none';
+    document.getElementById('f-sector').value = p.sector || '';
+    document.getElementById('f-region').value = p.region || '';
+  }
+}
+
+function showETFBreakdown(ticker, sectorBD, regionBD) {
+  document.getElementById('manual-classification').style.display = 'none';
+  const el = document.getElementById('etf-breakdown-info');
+  el.style.display = '';
+  const topSectors = Object.entries(sectorBD).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([s,p])=>`${s} ${p.toFixed(1)}%`).join(' · ');
+  const topRegions = Object.entries(regionBD).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([r,p])=>`${r} ${p.toFixed(1)}%`).join(' · ');
+  el.innerHTML = `<div class="breakdown-info">
+    <strong>ETF — Diversified Breakdown</strong>
+    <span>Sectors: ${topSectors}</span><br>
+    <span style="margin-top:4px;display:block">Regions: ${topRegions}</span>
+  </div>`;
+}
+
+// Autocomplete
+function buildAC(query) {
+  const q = query.toUpperCase().trim();
+  if (!q) return [];
+  return Object.entries(STOCK_DB)
+    .filter(([k, v]) => k.startsWith(q) || v.name.toUpperCase().includes(q))
+    .slice(0, 8)
+    .map(([k, v]) => ({ ticker: k, name: v.name, type: v.type }));
+}
+
+document.getElementById('f-ticker').addEventListener('input', function() {
+  const val = this.value.trim();
+  const items = buildAC(val);
+  const list = document.getElementById('ac-list');
+  if (!items.length || !val) { list.classList.remove('open'); return; }
+  list.innerHTML = items.map(i =>
+    `<div class="ac-item" data-ticker="${i.ticker}">
+      <span class="ac-ticker">${i.ticker} <span style="font-size:11px;color:var(--accent);font-weight:400">${i.type === 'etf' ? 'ETF' : ''}</span></span>
+      <span class="ac-name">${i.name}</span>
+    </div>`
+  ).join('');
+  list.classList.add('open');
+  list.querySelectorAll('.ac-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectTicker(el.dataset.ticker);
+    });
+  });
+});
+
+function selectTicker(ticker) {
+  const info = STOCK_DB[ticker];
+  document.getElementById('f-ticker').value = ticker;
+  document.getElementById('ac-list').classList.remove('open');
+  if (info) {
+    document.getElementById('f-name').value = info.name;
+    currentLookup = { ticker, ...info };
+    if (info.type === 'etf') {
+      showETFBreakdown(ticker, info.sectorBreakdown, info.regionBreakdown);
+    } else {
+      document.getElementById('manual-classification').style.display = '';
+      document.getElementById('etf-breakdown-info').style.display = 'none';
+      document.getElementById('f-sector').value = info.sector || '';
+      document.getElementById('f-region').value = info.region || '';
+    }
+  }
+}
+
+document.getElementById('f-ticker').addEventListener('blur', () => {
+  setTimeout(() => document.getElementById('ac-list').classList.remove('open'), 150);
+});
+
+// Save
+document.getElementById('btn-save').addEventListener('click', async () => {
+  const ticker = document.getElementById('f-ticker').value.trim().toUpperCase();
+  const name = document.getElementById('f-name').value.trim();
+  const qty = parseFloat(document.getElementById('f-qty').value);
+  const price = parseFloat(document.getElementById('f-price').value);
+
+  if (!ticker) { showToast('Enter a ticker symbol'); return; }
+  if (!qty || qty <= 0) { showToast('Enter a valid quantity'); return; }
+  if (!price || price <= 0) { showToast('Enter a valid price'); return; }
+
+  const lookup = currentLookup || STOCK_DB[ticker];
+  let position;
+
+  if (lookup && lookup.type === 'etf') {
+    position = {
+      id: editingId || crypto.randomUUID(),
+      ticker, name: name || lookup.name,
+      quantity: qty, price,
+      type: 'etf',
+      sectorBreakdown: lookup.sectorBreakdown,
+      regionBreakdown: lookup.regionBreakdown,
+    };
+  } else {
+    const sector = document.getElementById('f-sector').value;
+    const region = document.getElementById('f-region').value;
+    position = {
+      id: editingId || crypto.randomUUID(),
+      ticker, name,
+      quantity: qty, price,
+      type: lookup ? lookup.type : 'stock',
+      sector: sector || (lookup && lookup.sector) || 'Other',
+      region: region || (lookup && lookup.region) || 'Other',
+    };
+  }
+
+  await dbPut(position);
+  positions = await dbGetAll();
+  renderAll();
+  closeModal();
+  showToast(editingId ? 'Position updated' : 'Position added');
+});
+
+// Delete
+document.getElementById('btn-delete').addEventListener('click', async () => {
+  if (!editingId) return;
+  if (!confirm('Remove this position?')) return;
+  await dbDelete(editingId);
+  positions = await dbGetAll();
+  renderAll();
+  closeModal();
+  showToast('Position removed');
+});
+
+// Close
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// ═══════════════════════════════════════════
+// FAB
+// ═══════════════════════════════════════════
+document.getElementById('fab').addEventListener('click', openAddModal);
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ═══════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════
+document.getElementById('btn-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(positions, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rebalance-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showToast('Portfolio exported');
+});
+
+document.getElementById('btn-import').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) throw new Error('Invalid format');
+    for (const item of data) await dbPut(item);
+    positions = await dbGetAll();
+    renderAll();
+    showToast(`Imported ${data.length} positions`);
+  } catch {
+    showToast('Import failed — invalid file');
+  }
+  this.value = '';
+});
+
+document.getElementById('btn-clear').addEventListener('click', async () => {
+  if (!confirm('Delete all positions? This cannot be undone.')) return;
+  await dbClear();
+  positions = [];
+  renderAll();
+  showToast('All data cleared');
+});
+
+// ═══════════════════════════════════════════
+// REFRESH PRICES (Yahoo Finance attempt)
+// ═══════════════════════════════════════════
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  if (!positions.length) { showToast('No positions to refresh'); return; }
+  showToast('Fetching prices…');
+  let updated = 0;
+  for (const p of positions) {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(p.ticker)}?interval=1d&range=1d`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const price = json?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price) {
+        p.price = price;
+        await dbPut(p);
+        updated++;
+      }
+    } catch { /* CORS or network error — skip */ }
+  }
+  if (updated > 0) {
+    positions = await dbGetAll();
+    renderAll();
+    showToast(`Updated ${updated} price${updated > 1 ? 's' : ''}`);
+  } else {
+    showToast('Could not fetch prices — update manually');
+  }
+});
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+// PWA
+// ═══════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+openDB().then(async () => {
+  positions = await dbGetAll();
+  renderAll();
+});
+</script>
+</body>
+</html>
