@@ -1,4 +1,4 @@
-const CACHE = 'rebalance-v4';
+const CACHE = 'rebalance-v5';
 const STATIC = [
   './',
   './index.html',
