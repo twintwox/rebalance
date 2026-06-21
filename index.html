@@ -277,6 +277,43 @@
     .ios-step-text span { font-size: 13px; color: var(--muted); }
     .ios-share-icon { display: inline-block; vertical-align: middle; }
 
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinning svg { animation: spin 0.7s linear infinite; }
+    .icon-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+    /* ── Ticker row (input + lookup btn) ── */
+    .ticker-row { display: flex; gap: 8px; align-items: flex-start; }
+    .ticker-row .autocomplete-wrap { flex: 1; }
+    .ticker-lookup-btn { flex-shrink: 0; width: 46px; height: 46px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+    .ticker-lookup-btn:hover { background: var(--border); color: var(--text); border-color: var(--accent); }
+    .ticker-lookup-btn svg { width: 18px; height: 18px; }
+
+    /* ── Multi-sector selector ── */
+    .sector-chips { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface2); }
+    .sector-chips:empty { display: none; }
+    .sector-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .sector-row:last-child { border-bottom: none; }
+    .sector-dot-sm { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .sector-name-lbl { flex: 1; font-size: 14px; color: var(--text); }
+    .sector-pct-input { width: 60px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-family: inherit; font-size: 14px; padding: 5px 8px; text-align: right; outline: none; }
+    .sector-pct-input:focus { border-color: var(--accent); }
+    .pct-label { font-size: 13px; color: var(--muted); }
+    .sector-remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; }
+    .sector-remove-btn:hover { color: var(--danger); }
+    .sector-add-wrap { position: relative; margin-top: 8px; }
+    .sector-add-btn { width: 100%; background: var(--surface2); border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-family: inherit; font-size: 13px; padding: 9px 14px; cursor: pointer; text-align: left; transition: border-color 0.15s, color 0.15s; }
+    .sector-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .sector-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 300; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .sector-dropdown.open { display: block; }
+    .sector-opt { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .sector-opt:last-child { border-bottom: none; }
+    .sector-opt:hover { background: var(--surface); }
+    .sector-opt.used { opacity: 0.35; pointer-events: none; }
+    .pct-sum-hint { font-size: 11px; margin-top: 6px; }
+    .pct-ok { color: var(--success); }
+    .pct-warn { color: var(--warning); }
+
     /* ── Misc ── */
     .no-data { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
     select option { background: #1a1f36; }
@@ -429,10 +466,16 @@
     <div class="form-body">
       <div class="field">
         <label>Ticker Symbol</label>
-        <div class="autocomplete-wrap">
-          <input type="text" id="f-ticker" placeholder="e.g. AAPL, SPY, VXUS" autocomplete="off" autocapitalize="characters">
-          <div class="autocomplete-list" id="ac-list"></div>
+        <div class="ticker-row">
+          <div class="autocomplete-wrap">
+            <input type="text" id="f-ticker" placeholder="e.g. AAPL, SPY, VXUS" autocomplete="off" autocapitalize="characters">
+            <div class="autocomplete-list" id="ac-list"></div>
+          </div>
+          <button type="button" id="btn-ticker-lookup" class="ticker-lookup-btn" title="Fetch price & sector info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
         </div>
+        <div class="field-hint" id="ticker-lookup-status"></div>
       </div>
       <div class="field">
         <label>Name</label>
@@ -449,27 +492,16 @@
         </div>
       </div>
 
-      <!-- Single sector/region (stocks & unknown) -->
+      <!-- Manual classification (stocks & unknown) -->
       <div id="manual-classification">
         <div class="field">
-          <label>Sector</label>
-          <select id="f-sector">
-            <option value="">Select sector…</option>
-            <option>Technology</option>
-            <option>Financials</option>
-            <option>Healthcare</option>
-            <option>Consumer Discretionary</option>
-            <option>Consumer Staples</option>
-            <option>Communication Services</option>
-            <option>Industrials</option>
-            <option>Energy</option>
-            <option>Materials</option>
-            <option>Real Estate</option>
-            <option>Utilities</option>
-            <option>Bonds/Fixed Income</option>
-            <option>Commodities</option>
-            <option>Other</option>
-          </select>
+          <label>Sector(s)</label>
+          <div class="sector-chips" id="sector-chips"></div>
+          <div class="sector-add-wrap">
+            <button type="button" id="sector-add-btn" class="sector-add-btn">+ Add sector</button>
+            <div class="sector-dropdown" id="sector-dropdown"></div>
+          </div>
+          <div class="pct-sum-hint" id="pct-sum-hint"></div>
         </div>
         <div class="field">
           <label>Region</label>
@@ -721,6 +753,114 @@ function getColor(map, key) {
 }
 
 // ═══════════════════════════════════════════
+// YAHOO FINANCE MAPPINGS
+// ═══════════════════════════════════════════
+const YAHOO_SECTOR_MAP = {
+  technology: 'Technology',
+  financial_services: 'Financials',
+  healthcare: 'Healthcare',
+  consumer_cyclical: 'Consumer Discretionary',
+  consumer_defensive: 'Consumer Staples',
+  communication_services: 'Communication Services',
+  industrials: 'Industrials',
+  energy: 'Energy',
+  basic_materials: 'Materials',
+  real_estate: 'Real Estate',
+  utilities: 'Utilities',
+};
+
+const COUNTRY_REGION_MAP = {
+  'United States': 'United States',
+  'China': 'Emerging Markets', 'Taiwan': 'Asia Pacific', 'Japan': 'Asia Pacific',
+  'South Korea': 'Asia Pacific', 'India': 'Emerging Markets', 'Hong Kong': 'Asia Pacific',
+  'Singapore': 'Asia Pacific', 'Australia': 'Asia Pacific', 'New Zealand': 'Asia Pacific',
+  'Brazil': 'Latin America', 'Argentina': 'Latin America', 'Mexico': 'Latin America',
+  'Chile': 'Latin America', 'Colombia': 'Latin America', 'Peru': 'Latin America',
+  'Germany': 'Europe', 'France': 'Europe', 'United Kingdom': 'Europe',
+  'Netherlands': 'Europe', 'Switzerland': 'Europe', 'Sweden': 'Europe',
+  'Spain': 'Europe', 'Italy': 'Europe', 'Denmark': 'Europe', 'Norway': 'Europe',
+  'Finland': 'Europe', 'Belgium': 'Europe', 'Ireland': 'Europe', 'Luxembourg': 'Europe',
+  'Portugal': 'Europe', 'Austria': 'Europe', 'Greece': 'Europe', 'Poland': 'Europe',
+  'Canada': 'Canada',
+  'South Africa': 'Emerging Markets', 'Nigeria': 'Emerging Markets', 'Egypt': 'Emerging Markets',
+  'Saudi Arabia': 'Emerging Markets', 'UAE': 'Emerging Markets', 'Israel': 'Emerging Markets',
+  'Russia': 'Emerging Markets', 'Turkey': 'Emerging Markets',
+};
+
+// ═══════════════════════════════════════════
+// PRICE FETCHING
+// ═══════════════════════════════════════════
+const SECTORS_LIST = [
+  'Technology','Financials','Healthcare','Consumer Discretionary','Consumer Staples',
+  'Communication Services','Industrials','Energy','Materials','Real Estate','Utilities',
+  'Bonds/Fixed Income','Commodities','Other',
+];
+
+async function fetchTickerInfo(ticker) {
+  const t = encodeURIComponent(ticker);
+  const chartUrl  = `https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`;
+  const sumUrl    = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${t}?modules=assetProfile,topHoldings`;
+  const proxies   = [
+    u => u,
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  ];
+
+  for (const proxy of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 7000);
+      const [chartRes, sumRes] = await Promise.all([
+        fetch(proxy(chartUrl), { signal: ctrl.signal }),
+        fetch(proxy(sumUrl),   { signal: ctrl.signal }),
+      ]);
+      clearTimeout(timer);
+
+      if (!chartRes.ok) continue;
+      const chartJson = await chartRes.json();
+      const meta = chartJson?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) continue;
+
+      const info = {
+        price: meta.regularMarketPrice,
+        name:  meta.longName || meta.shortName || null,
+        sector: null, region: null,
+        sectorBreakdown: null, regionBreakdown: null,
+      };
+
+      if (sumRes.ok) {
+        const sumJson  = await sumRes.json();
+        const result   = sumJson?.quoteSummary?.result?.[0];
+        const profile  = result?.assetProfile;
+        const holdings = result?.topHoldings;
+
+        if (profile?.sector)  info.sector = profile.sector;
+        if (profile?.country) info.region = COUNTRY_REGION_MAP[profile.country] || 'Other';
+
+        // ETF sector weightings
+        if (holdings?.sectorWeightings?.length) {
+          const bd = {};
+          holdings.sectorWeightings.forEach(sw => {
+            Object.entries(sw).forEach(([k, v]) => {
+              const s = YAHOO_SECTOR_MAP[k];
+              if (s && v > 0) bd[s] = +(((bd[s] || 0) + v * 100).toFixed(2));
+            });
+          });
+          if (Object.keys(bd).length) info.sectorBreakdown = bd;
+        }
+
+        // ETF equity region breakdown
+        if (holdings?.equityHoldings) {
+          // Not all funds expose this; skip if missing
+        }
+      }
+      return info;
+    } catch { /* try next proxy */ }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
 // INDEXEDDB
 // ═══════════════════════════════════════════
 let db;
@@ -776,6 +916,7 @@ let activeTab = 'portfolio';
 let editingId = null;
 let sectorChartInst = null;
 let regionChartInst = null;
+let selectedSectors = {}; // { sectorName: pct } for manual classification
 
 // ═══════════════════════════════════════════
 // COMPUTE EXPOSURE
@@ -788,7 +929,7 @@ function computeExposure() {
     const val = (p.quantity || 0) * (p.price || 0);
     totalValue += val;
 
-    if (p.type === 'etf' && p.sectorBreakdown && Object.keys(p.sectorBreakdown).length) {
+    if (p.sectorBreakdown && Object.keys(p.sectorBreakdown).length) {
       Object.entries(p.sectorBreakdown).forEach(([s, pct]) => {
         sectors[s] = (sectors[s] || 0) + val * pct / 100;
       });
@@ -797,7 +938,7 @@ function computeExposure() {
       sectors[s] = (sectors[s] || 0) + val;
     }
 
-    if (p.type === 'etf' && p.regionBreakdown && Object.keys(p.regionBreakdown).length) {
+    if (p.regionBreakdown && Object.keys(p.regionBreakdown).length) {
       Object.entries(p.regionBreakdown).forEach(([r, pct]) => {
         regions[r] = (regions[r] || 0) + val * pct / 100;
       });
@@ -854,8 +995,12 @@ function renderPortfolio() {
   list.innerHTML = positions.map(p => {
     const val = (p.quantity || 0) * (p.price || 0);
     const pct = totalValue > 0 ? val / totalValue * 100 : 0;
-    const sectorLabel = p.type === 'etf' ? 'Multi-sector' : (p.sector || '—');
-    const regionLabel = p.type === 'etf' ? 'Multi-region' : (p.region || '—');
+    const sectorLabel = (p.sectorBreakdown && Object.keys(p.sectorBreakdown).length > 1)
+      ? 'Multi-sector'
+      : (p.sector || (p.sectorBreakdown && Object.keys(p.sectorBreakdown)[0]) || '—');
+    const regionLabel = (p.regionBreakdown && Object.keys(p.regionBreakdown).length > 1)
+      ? 'Multi-region'
+      : (p.region || (p.regionBreakdown && Object.keys(p.regionBreakdown)[0]) || '—');
     return `<div class="position-item" data-id="${p.id}">
       <div class="pos-row1">
         <div>
@@ -1036,11 +1181,13 @@ function closeModal() {
 
 function clearForm() {
   ['f-ticker','f-name','f-qty','f-price'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-sector').value = '';
   document.getElementById('f-region').value = '';
+  document.getElementById('ticker-lookup-status').textContent = '';
   document.getElementById('manual-classification').style.display = '';
   document.getElementById('etf-breakdown-info').style.display = 'none';
   document.getElementById('etf-breakdown-info').innerHTML = '';
+  selectedSectors = {};
+  renderSectorChips();
 }
 
 function fillForm(p) {
@@ -1048,28 +1195,135 @@ function fillForm(p) {
   document.getElementById('f-name').value = p.name || '';
   document.getElementById('f-qty').value = p.quantity || '';
   document.getElementById('f-price').value = p.price || '';
-  if (p.type === 'etf' && p.sectorBreakdown) {
-    showETFBreakdown(p.ticker, p.sectorBreakdown, p.regionBreakdown);
+  document.getElementById('ticker-lookup-status').textContent = '';
+  // ETF with pre-built breakdown → show info card, hide manual
+  if (p.type === 'etf' && p.sectorBreakdown && !p._manualBreakdown) {
+    showETFBreakdown(p.sectorBreakdown, p.regionBreakdown);
+    currentLookup = p;
   } else {
     document.getElementById('manual-classification').style.display = '';
     document.getElementById('etf-breakdown-info').style.display = 'none';
-    document.getElementById('f-sector').value = p.sector || '';
     document.getElementById('f-region').value = p.region || '';
+    // Load sectorBreakdown into multi-select (covers stocks with breakdown too)
+    if (p.sectorBreakdown && Object.keys(p.sectorBreakdown).length) {
+      selectedSectors = { ...p.sectorBreakdown };
+    } else if (p.sector) {
+      selectedSectors = { [p.sector]: 100 };
+    } else {
+      selectedSectors = {};
+    }
+    renderSectorChips();
   }
 }
 
-function showETFBreakdown(ticker, sectorBD, regionBD) {
+function showETFBreakdown(sectorBD, regionBD) {
   document.getElementById('manual-classification').style.display = 'none';
   const el = document.getElementById('etf-breakdown-info');
   el.style.display = '';
   const topSectors = Object.entries(sectorBD).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([s,p])=>`${s} ${p.toFixed(1)}%`).join(' · ');
-  const topRegions = Object.entries(regionBD).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([r,p])=>`${r} ${p.toFixed(1)}%`).join(' · ');
+  const regionPart = regionBD
+    ? Object.entries(regionBD).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([r,p])=>`${r} ${p.toFixed(1)}%`).join(' · ')
+    : 'N/A';
   el.innerHTML = `<div class="breakdown-info">
-    <strong>ETF — Diversified Breakdown</strong>
+    <strong>Auto-detected breakdown</strong>
     <span>Sectors: ${topSectors}</span><br>
-    <span style="margin-top:4px;display:block">Regions: ${topRegions}</span>
+    <span style="margin-top:4px;display:block">Regions: ${regionPart}</span>
   </div>`;
 }
+
+// ═══════════════════════════════════════════
+// MULTI-SECTOR UI
+// ═══════════════════════════════════════════
+function renderSectorChips() {
+  const chips = document.getElementById('sector-chips');
+  const hint  = document.getElementById('pct-sum-hint');
+
+  chips.innerHTML = Object.entries(selectedSectors).map(([name, pct]) => {
+    const color = getColor(SECTOR_COLORS, name);
+    return `<div class="sector-row" data-sector="${name}">
+      <span class="sector-dot-sm" style="background:${color}"></span>
+      <span class="sector-name-lbl">${name}</span>
+      <input class="sector-pct-input" type="number" min="0" max="100" step="0.1" value="${pct}" data-sector="${name}">
+      <span class="pct-label">%</span>
+      <button class="sector-remove-btn" data-sector="${name}" title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  // Pct sum hint
+  const total = Object.values(selectedSectors).reduce((s, v) => s + v, 0);
+  if (Object.keys(selectedSectors).length === 0) {
+    hint.textContent = '';
+  } else if (Math.abs(total - 100) < 0.1) {
+    hint.className = 'pct-sum-hint pct-ok';
+    hint.textContent = '✓ Sectors sum to 100%';
+  } else {
+    hint.className = 'pct-sum-hint pct-warn';
+    hint.textContent = `⚠ Sum is ${total.toFixed(1)}% — must equal 100%`;
+  }
+
+  // Events: percentage change
+  chips.querySelectorAll('.sector-pct-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      selectedSectors[inp.dataset.sector] = parseFloat(inp.value) || 0;
+      renderSectorHint();
+    });
+  });
+  // Events: remove
+  chips.querySelectorAll('.sector-remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete selectedSectors[btn.dataset.sector];
+      renderSectorChips();
+      renderSectorDropdown();
+    });
+  });
+
+  renderSectorDropdown();
+}
+
+function renderSectorHint() {
+  const hint = document.getElementById('pct-sum-hint');
+  const total = Object.values(selectedSectors).reduce((s, v) => s + v, 0);
+  if (Object.keys(selectedSectors).length === 0) { hint.textContent = ''; return; }
+  if (Math.abs(total - 100) < 0.1) {
+    hint.className = 'pct-sum-hint pct-ok'; hint.textContent = '✓ Sectors sum to 100%';
+  } else {
+    hint.className = 'pct-sum-hint pct-warn'; hint.textContent = `⚠ Sum is ${total.toFixed(1)}% — must equal 100%`;
+  }
+}
+
+function renderSectorDropdown() {
+  const dd = document.getElementById('sector-dropdown');
+  dd.innerHTML = SECTORS_LIST.map(s => {
+    const used = s in selectedSectors;
+    const color = getColor(SECTOR_COLORS, s);
+    return `<div class="sector-opt${used ? ' used' : ''}" data-sector="${s}">
+      <span class="sector-dot-sm" style="background:${color}"></span>
+      <span>${s}</span>
+    </div>`;
+  }).join('');
+  dd.querySelectorAll('.sector-opt:not(.used)').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = el.dataset.sector;
+      // Auto-distribute: give new sector remainder or equal share
+      const used = Object.keys(selectedSectors);
+      const remaining = Math.max(0, 100 - Object.values(selectedSectors).reduce((a,b)=>a+b,0));
+      selectedSectors[s] = parseFloat(remaining.toFixed(1));
+      renderSectorChips();
+      document.getElementById('sector-dropdown').classList.remove('open');
+    });
+  });
+}
+
+document.getElementById('sector-add-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  const dd = document.getElementById('sector-dropdown');
+  dd.classList.toggle('open');
+  renderSectorDropdown();
+});
+document.addEventListener('click', e => {
+  const dd = document.getElementById('sector-dropdown');
+  if (!e.target.closest('.sector-add-wrap')) dd.classList.remove('open');
+});
 
 // Autocomplete
 function buildAC(query) {
@@ -1126,37 +1380,56 @@ document.getElementById('f-ticker').addEventListener('blur', () => {
 // Save
 document.getElementById('btn-save').addEventListener('click', async () => {
   const ticker = document.getElementById('f-ticker').value.trim().toUpperCase();
-  const name = document.getElementById('f-name').value.trim();
-  const qty = parseFloat(document.getElementById('f-qty').value);
-  const price = parseFloat(document.getElementById('f-price').value);
+  const name   = document.getElementById('f-name').value.trim();
+  const qty    = parseFloat(document.getElementById('f-qty').value);
+  const price  = parseFloat(document.getElementById('f-price').value);
 
-  if (!ticker) { showToast('Enter a ticker symbol'); return; }
+  if (!ticker)          { showToast('Enter a ticker symbol'); return; }
   if (!qty || qty <= 0) { showToast('Enter a valid quantity'); return; }
   if (!price || price <= 0) { showToast('Enter a valid price'); return; }
 
   const lookup = currentLookup || STOCK_DB[ticker];
   let position;
 
-  if (lookup && lookup.type === 'etf') {
+  // ETF with pre-built breakdown (from DB or fetched) and not manually overridden
+  if (lookup && lookup.type === 'etf' && lookup.sectorBreakdown && !lookup._manualBreakdown) {
     position = {
       id: editingId || crypto.randomUUID(),
-      ticker, name: name || lookup.name,
+      ticker, name: name || lookup.name || ticker,
       quantity: qty, price,
       type: 'etf',
       sectorBreakdown: lookup.sectorBreakdown,
-      regionBreakdown: lookup.regionBreakdown,
+      regionBreakdown: lookup.regionBreakdown || null,
     };
   } else {
-    const sector = document.getElementById('f-sector').value;
+    // Manual / stock path — use multi-sector selectedSectors
     const region = document.getElementById('f-region').value;
+    const sectorKeys = Object.keys(selectedSectors);
+    const pctTotal = Object.values(selectedSectors).reduce((s, v) => s + v, 0);
+
+    if (sectorKeys.length > 0 && Math.abs(pctTotal - 100) > 0.5) {
+      showToast(`Sector percentages sum to ${pctTotal.toFixed(1)}% — must equal 100%`);
+      return;
+    }
+
     position = {
       id: editingId || crypto.randomUUID(),
-      ticker, name,
+      ticker, name: name || (lookup && lookup.name) || ticker,
       quantity: qty, price,
-      type: lookup ? lookup.type : 'stock',
-      sector: sector || (lookup && lookup.sector) || 'Other',
+      type: (lookup && lookup.type) || 'stock',
       region: region || (lookup && lookup.region) || 'Other',
     };
+
+    if (sectorKeys.length === 1) {
+      // Single sector — store flat for clean display
+      position.sector = sectorKeys[0];
+    } else if (sectorKeys.length > 1) {
+      // Multi-sector
+      position.sectorBreakdown = { ...selectedSectors };
+      position._manualBreakdown = true;
+    } else {
+      position.sector = (lookup && lookup.sector) || 'Other';
+    }
   }
 
   await dbPut(position);
@@ -1231,32 +1504,85 @@ document.getElementById('btn-clear').addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════
-// REFRESH PRICES (Yahoo Finance attempt)
+// REFRESH ALL PRICES (sync button)
 // ═══════════════════════════════════════════
 document.getElementById('btn-refresh').addEventListener('click', async () => {
   if (!positions.length) { showToast('No positions to refresh'); return; }
-  showToast('Fetching prices…');
-  let updated = 0;
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning'); btn.disabled = true;
+  showToast(`Fetching ${positions.length} price${positions.length > 1 ? 's' : ''}…`);
+
+  let updated = 0, failed = 0;
   for (const p of positions) {
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(p.ticker)}?interval=1d&range=1d`;
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const json = await res.json();
-      const price = json?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (price) {
-        p.price = price;
-        await dbPut(p);
-        updated++;
-      }
-    } catch { /* CORS or network error — skip */ }
+    const info = await fetchTickerInfo(p.ticker);
+    if (info?.price) {
+      p.price = info.price;
+      await dbPut(p);
+      updated++;
+    } else {
+      failed++;
+    }
   }
-  if (updated > 0) {
-    positions = await dbGetAll();
-    renderAll();
-    showToast(`Updated ${updated} price${updated > 1 ? 's' : ''}`);
+
+  btn.classList.remove('spinning'); btn.disabled = false;
+  positions = await dbGetAll();
+  renderAll();
+  if (updated > 0 && failed === 0) showToast(`✓ Updated ${updated} price${updated > 1 ? 's' : ''}`);
+  else if (updated > 0) showToast(`Updated ${updated}, ${failed} failed — check network`);
+  else showToast('Could not fetch prices — check your connection');
+});
+
+// ═══════════════════════════════════════════
+// TICKER LOOKUP BUTTON (in modal)
+// ═══════════════════════════════════════════
+document.getElementById('btn-ticker-lookup').addEventListener('click', async () => {
+  const ticker = document.getElementById('f-ticker').value.trim().toUpperCase();
+  if (!ticker) { showToast('Enter a ticker first'); return; }
+
+  const btn    = document.getElementById('btn-ticker-lookup');
+  const status = document.getElementById('ticker-lookup-status');
+  btn.classList.add('spinning'); btn.disabled = true;
+  status.textContent = 'Looking up…';
+  status.style.color = 'var(--muted)';
+
+  const info = await fetchTickerInfo(ticker);
+
+  btn.classList.remove('spinning'); btn.disabled = false;
+
+  if (!info) {
+    status.textContent = '✕ Not found — fill in manually';
+    status.style.color = 'var(--danger)';
+    return;
+  }
+
+  // Populate price & name
+  if (info.price) document.getElementById('f-price').value = info.price.toFixed(2);
+  if (info.name && !document.getElementById('f-name').value) document.getElementById('f-name').value = info.name;
+
+  // ETF with sector breakdown from Yahoo
+  if (info.sectorBreakdown) {
+    currentLookup = {
+      type: 'etf',
+      name: info.name || ticker,
+      sectorBreakdown: info.sectorBreakdown,
+      regionBreakdown: info.regionBreakdown || (info.region ? { [info.region]: 100 } : null),
+    };
+    showETFBreakdown(info.sectorBreakdown, currentLookup.regionBreakdown);
+    status.textContent = `✓ Price $${info.price.toFixed(2)} · sector breakdown loaded`;
+    status.style.color = 'var(--success)';
   } else {
-    showToast('Could not fetch prices — update manually');
+    // Stock — populate multi-sector and region
+    document.getElementById('manual-classification').style.display = '';
+    document.getElementById('etf-breakdown-info').style.display = 'none';
+    if (info.region && !document.getElementById('f-region').value) {
+      document.getElementById('f-region').value = info.region;
+    }
+    if (info.sector && Object.keys(selectedSectors).length === 0) {
+      selectedSectors = { [info.sector]: 100 };
+      renderSectorChips();
+    }
+    status.textContent = `✓ Price $${info.price.toFixed(2)}${info.sector ? ' · ' + info.sector : ''}`;
+    status.style.color = 'var(--success)';
   }
 });
 
