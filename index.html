@@ -63,12 +63,12 @@
       height: calc(var(--tab-h) + var(--safe-b));
       padding-bottom: var(--safe-b);
       background: var(--surface); border-top: 1px solid var(--border);
-      display: grid; grid-template-columns: repeat(5, 1fr);
+      display: grid; grid-template-columns: repeat(3, 1fr);
     }
     .tab-btn {
       background: none; border: none; cursor: pointer; color: var(--muted);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px; font-size: 9px; font-family: inherit; font-weight: 500; transition: color 0.15s;
+      gap: 4px; font-size: 10px; font-family: inherit; font-weight: 500; transition: color 0.15s;
     }
     .tab-btn svg { width: 22px; height: 22px; }
     .tab-btn.active { color: var(--accent); }
@@ -348,20 +348,23 @@
     .gemini-note.active { color: var(--success); }
 
     /* ── Rebalance tab ── */
-    .rb-exp-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .rb-exp-tabs { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
     .rb-exp-tab { background: none; border: none; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; padding: 8px 16px 10px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .rb-exp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .rb-exp-row { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-    .rb-exp-row:last-child { border-bottom: none; }
-    .rb-exp-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-    .rb-exp-name { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rb-exp-orig { color: var(--muted); font-size: 12px; min-width: 36px; text-align: right; }
-    .rb-exp-arrow { color: var(--muted); font-size: 11px; }
-    .rb-exp-sim { font-weight: 600; min-width: 36px; text-align: right; }
-    .rb-exp-diff { font-size: 11px; min-width: 42px; text-align: right; font-weight: 600; }
-    .rb-summary { display: flex; justify-content: space-between; align-items: center; }
-    .rb-summary-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .rb-summary-value { font-size: 15px; font-weight: 700; }
+    .rb-reset-btn { background: none; border: none; font-family: inherit; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+    .rb-reset-btn:hover { background: var(--surface2); color: var(--text); }
+    .rb-trow { padding: 8px 2px 4px; border-bottom: 1px solid var(--border); border-radius: 4px; transition: background 0.25s; }
+    .rb-trow:last-child { border-bottom: none; }
+    .rb-trow.rb-up   { background: rgba(34,197,94,0.07); }
+    .rb-trow.rb-down { background: rgba(239,68,68,0.07); }
+    .rb-trow-main { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .rb-trow-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .rb-trow-name { flex: 1; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rb-trow-val  { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+    .rb-trow-pct  { font-size: 13px; font-weight: 600; min-width: 40px; text-align: right; flex-shrink: 0; }
+    .rb-trow-delta { font-size: 11px; font-weight: 600; min-width: 38px; text-align: right; flex-shrink: 0; }
+    .rb-trow-bar-wrap { height: 3px; background: var(--surface2); border-radius: 2px; }
+    .rb-trow-bar { height: 3px; border-radius: 2px; transition: width 0.3s; }
     .rb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; position: relative; }
     .rb-card.rb-hypo { border-style: dashed; border-color: var(--accent); }
     .rb-card-row1 { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; padding-right: 20px; }
@@ -383,8 +386,6 @@
     .rb-remove-hypo { position: absolute; top: 7px; right: 8px; background: none; border: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
     .rb-remove-hypo:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
     .rb-btn-row { display: flex; gap: 8px; margin-top: 4px; }
-    .rb-chart-wrap { position: relative; width: 100%; max-width: 220px; margin: 0 auto; }
-    .rb-toggle-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px 8px; line-height: 1; }
   </style>
 </head>
 <body>
@@ -421,40 +422,6 @@
         <div class="icon">📊</div>
         <h3>No positions yet</h3>
         <p>Tap the + button to add your first stock or index fund.</p>
-      </div>
-      <div style="height:80px"></div>
-    </section>
-
-    <!-- Sectors -->
-    <section id="view-sectors" class="view">
-      <div class="card" style="margin-bottom:16px">
-        <div class="chart-container">
-          <canvas id="sector-chart"></canvas>
-          <div class="chart-center-label">
-            <div class="cl-value" id="sector-center-val">—</div>
-            <div class="cl-label">by sector</div>
-          </div>
-        </div>
-      </div>
-      <div class="card" id="sector-table-wrap">
-        <div class="no-data" id="sector-empty">Add positions to see sector exposure</div>
-      </div>
-      <div style="height:80px"></div>
-    </section>
-
-    <!-- Regions -->
-    <section id="view-regions" class="view">
-      <div class="card" style="margin-bottom:16px">
-        <div class="chart-container">
-          <canvas id="region-chart"></canvas>
-          <div class="chart-center-label">
-            <div class="cl-value" id="region-center-val">—</div>
-            <div class="cl-label">by region</div>
-          </div>
-        </div>
-      </div>
-      <div class="card" id="region-table-wrap">
-        <div class="no-data" id="region-empty">Add positions to see region exposure</div>
       </div>
       <div style="height:80px"></div>
     </section>
@@ -514,23 +481,22 @@
 
     <!-- Rebalance -->
     <section id="view-rebalance" class="view">
-      <div class="card rb-summary" style="margin-bottom:12px">
-        <div>
-          <div class="rb-summary-label">Simulated Portfolio</div>
-          <div class="rb-summary-value" id="rb-total-val" style="color:var(--muted)">—</div>
-        </div>
-        <button class="btn btn-ghost" id="rb-reset" style="padding:7px 14px;font-size:13px">Reset</button>
-      </div>
       <div class="card" style="margin-bottom:12px">
-        <div class="rb-exp-tabs" style="justify-content:space-between;align-items:center">
+        <div class="rb-exp-tabs">
           <div style="display:flex">
             <button class="rb-exp-tab active" data-exp="sectors">Sectors</button>
             <button class="rb-exp-tab" data-exp="regions">Regions</button>
           </div>
-          <button class="rb-toggle-btn" id="rb-view-toggle" title="Toggle chart/table">≡</button>
+          <button class="rb-reset-btn" id="rb-reset">Reset</button>
         </div>
-        <div id="rb-exp-sectors"></div>
-        <div id="rb-exp-regions" style="display:none"></div>
+        <div class="chart-container" style="max-width:200px;margin:12px auto">
+          <canvas id="rb-chart-main"></canvas>
+          <div class="chart-center-label">
+            <div class="cl-value" id="rb-center-val">—</div>
+            <div class="cl-label">simulated</div>
+          </div>
+        </div>
+        <div id="rb-exp-table"></div>
       </div>
       <div id="rb-cards"></div>
       <div class="rb-btn-row">
@@ -544,14 +510,6 @@
     <button class="tab-btn active" data-tab="portfolio">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       Portfolio
-    </button>
-    <button class="tab-btn" data-tab="sectors">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-      Sectors
-    </button>
-    <button class="tab-btn" data-tab="regions">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      Regions
     </button>
     <button class="tab-btn" data-tab="rebalance">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><polyline points="23 20 1 20"/></svg>
@@ -1121,8 +1079,6 @@ function dbClear() {
 let positions = [];
 let activeTab = 'portfolio';
 let editingId = null;
-let sectorChartInst = null;
-let regionChartInst = null;
 let selectedSectors = {}; // { sectorName: pct } for manual classification
 let selectedRegions = {};
 
@@ -1237,110 +1193,8 @@ function renderPortfolio() {
   });
 }
 
-// ═══════════════════════════════════════════
-// RENDER CHARTS
-// ═══════════════════════════════════════════
-function renderChart(canvasId, data, colorMap, centerElId) {
-  const canvas = document.getElementById(canvasId);
-  const ctx = canvas.getContext('2d');
-  const labels = data.map(d => d[0]);
-  const values = data.map(d => d[1]);
-  const colors = labels.map(l => getColor(colorMap, l));
-  const total = values.reduce((s, v) => s + v, 0);
-
-  document.getElementById(centerElId).textContent = fmt(total);
-
-  const chartData = {
-    labels,
-    datasets: [{ data: values, backgroundColor: colors, borderColor: '#0f1117', borderWidth: 3, hoverBorderWidth: 3 }]
-  };
-
-  const existing = canvasId === 'sector-chart' ? sectorChartInst : regionChartInst;
-  if (existing) existing.destroy();
-
-  const inst = new Chart(ctx, {
-    type: 'doughnut',
-    data: chartData,
-    options: {
-      cutout: '68%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
-              return ` ${fmt(ctx.raw)} (${pct}%)`;
-            }
-          }
-        }
-      }
-    }
-  });
-
-  if (canvasId === 'sector-chart') sectorChartInst = inst;
-  else regionChartInst = inst;
-}
-
-function renderExposureTable(wrapId, emptyId, data, colorMap, totalValue) {
-  const wrap = document.getElementById(wrapId);
-  const empty = document.getElementById(emptyId);
-
-  if (!data.length || totalValue === 0) {
-    wrap.innerHTML = `<div class="no-data" id="${emptyId}">Add positions to see exposure</div>`;
-    return;
-  }
-  if (empty) empty.remove();
-
-  wrap.innerHTML = `<table class="exposure-table">
-    <thead><tr><th>Name</th><th>Value</th><th>Weight</th></tr></thead>
-    <tbody>
-      ${data.map(([name, val]) => {
-        const pct = totalValue > 0 ? val / totalValue * 100 : 0;
-        const color = getColor(colorMap, name);
-        return `<tr>
-          <td>
-            <div class="exp-name-cell">
-              <span class="exp-dot" style="background:${color}"></span>
-              <span>${name}</span>
-            </div>
-            <div class="exp-bar-wrap"><div class="exp-bar" style="width:${pct}%;background:${color}"></div></div>
-          </td>
-          <td>${fmt(val)}</td>
-          <td><span class="exp-pct">${fmtPct(pct)}</span></td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>`;
-}
-
-function renderSectors() {
-  const { totalValue, sectors } = computeExposure();
-  if (!sectors.length || totalValue === 0) {
-    document.getElementById('sector-center-val').textContent = '$0';
-    if (sectorChartInst) { sectorChartInst.destroy(); sectorChartInst = null; }
-    document.getElementById('sector-table-wrap').innerHTML = '<div class="no-data">Add positions to see sector exposure</div>';
-    return;
-  }
-  renderChart('sector-chart', sectors, SECTOR_COLORS, 'sector-center-val');
-  renderExposureTable('sector-table-wrap', null, sectors, SECTOR_COLORS, totalValue);
-}
-
-function renderRegions() {
-  const { totalValue, regions } = computeExposure();
-  if (!regions.length || totalValue === 0) {
-    document.getElementById('region-center-val').textContent = '$0';
-    if (regionChartInst) { regionChartInst.destroy(); regionChartInst = null; }
-    document.getElementById('region-table-wrap').innerHTML = '<div class="no-data">Add positions to see region exposure</div>';
-    return;
-  }
-  renderChart('region-chart', regions, REGION_COLORS, 'region-center-val');
-  renderExposureTable('region-table-wrap', null, regions, REGION_COLORS, totalValue);
-}
-
 function renderAll() {
   renderPortfolio();
-  renderSectors();
-  renderRegions();
 }
 
 // ═══════════════════════════════════════════
@@ -1351,8 +1205,6 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
   document.getElementById('fab').classList.toggle('hidden', tab !== 'portfolio');
-  if (tab === 'sectors') renderSectors();
-  if (tab === 'regions') renderRegions();
   if (tab === 'rebalance') renderRebalance();
 }
 
@@ -2061,8 +1913,7 @@ updateInstallSettingsLabel();
 let rbMultipliers = {};  // positionId → 0-200 (100 = keep current)
 let rbHypo = [];         // hypothetical positions (not in DB)
 let rbExpTab = 'sectors';
-let rbViewMode = 'table'; // 'table' | 'chart'
-let rbSectorChart = null, rbRegionChart = null;
+let rbMainChart = null;
 let addingHypo = false;
 
 function rbOrigVal(p) { return (p.quantity||0)*(p.price||0); }
@@ -2101,67 +1952,65 @@ function setRBSliderBg(slider, m) {
   slider.style.background = g;
 }
 
-function rbExpRowsHTML(simData, origData, colorMap) {
-  const oMap=Object.fromEntries(origData), sMap=Object.fromEntries(simData);
-  const names=[...new Set([...Object.keys(oMap),...Object.keys(sMap)])];
-  const oTot=origData.reduce((s,[,v])=>s+v,0), sTot=simData.reduce((s,[,v])=>s+v,0);
-  return names.sort((a,b)=>(sMap[b]||0)-(sMap[a]||0)).map(name=>{
-    const op=oTot>0?(oMap[name]||0)/oTot*100:0;
-    const sp=sTot>0?(sMap[name]||0)/sTot*100:0;
-    const d=sp-op;
-    const ds=Math.abs(d)<0.05?'—':(d>0?'+':'')+d.toFixed(1)+'%';
-    const dc=d>0.05?'var(--success)':d<-0.05?'var(--danger)':'var(--muted)';
-    const col=getColor(colorMap,name);
-    return `<div class="rb-exp-row">
-      <span class="rb-exp-dot" style="background:${col}"></span>
-      <span class="rb-exp-name">${name}</span>
-      <span class="rb-exp-orig">${op.toFixed(1)}%</span>
-      <span class="rb-exp-arrow">→</span>
-      <span class="rb-exp-sim">${sp.toFixed(1)}%</span>
-      <span class="rb-exp-diff" style="color:${dc}">${ds}</span>
+function rbTableHTML(simData, origData, colorMap) {
+  const oMap = Object.fromEntries(origData);
+  const oTot = origData.reduce((s,[,v])=>s+v, 0);
+  const sTot = simData.reduce((s,[,v])=>s+v, 0);
+  return simData.map(([name, val]) => {
+    const sp = sTot > 0 ? val / sTot * 100 : 0;
+    const op = oTot > 0 ? (oMap[name] || 0) / oTot * 100 : 0;
+    const diff = sp - op;
+    const color = getColor(colorMap, name);
+    const tintClass = diff > 0.05 ? 'rb-up' : diff < -0.05 ? 'rb-down' : '';
+    const deltaStr = Math.abs(diff) < 0.05 ? '' : (diff > 0 ? '+' : '') + diff.toFixed(1) + '%';
+    const deltaColor = diff > 0.05 ? 'var(--success)' : 'var(--danger)';
+    return `<div class="rb-trow ${tintClass}">
+      <div class="rb-trow-main">
+        <span class="rb-trow-dot" style="background:${color}"></span>
+        <span class="rb-trow-name">${name}</span>
+        <span class="rb-trow-val">${fmt(val)}</span>
+        <span class="rb-trow-pct">${sp.toFixed(1)}%</span>
+        ${deltaStr ? `<span class="rb-trow-delta" style="color:${deltaColor}">${deltaStr}</span>` : '<span class="rb-trow-delta"></span>'}
+      </div>
+      <div class="rb-trow-bar-wrap">
+        <div class="rb-trow-bar" style="width:${sp}%;background:${color}"></div>
+      </div>
     </div>`;
   }).join('');
 }
 
-function renderRBChart(canvasId, data, colorMap, existingInst) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return null;
-  if (existingInst) existingInst.destroy();
-  const labels = data.map(d=>d[0]), values = data.map(d=>d[1]);
-  const colors = labels.map(l=>getColor(colorMap,l));
-  return new Chart(canvas.getContext('2d'), {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#0f1117', borderWidth: 3 }] },
-    options: { cutout: '65%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
-      const tot = values.reduce((a,b)=>a+b,0);
-      return ` ${(ctx.raw/tot*100).toFixed(1)}%`;
-    }}}} },
-  });
-}
-
 function updateRBPreview() {
-  const orig=computeExposure(), sim=computeRBExposure();
-  const delta=sim.total-orig.totalValue;
-  const valEl=document.getElementById('rb-total-val');
-  valEl.textContent=`${fmt(orig.totalValue)} → ${fmt(sim.total)} (${delta>=0?'+':'−'}${fmt(Math.abs(delta))})`;
-  valEl.style.color=delta<-0.5?'var(--danger)':delta>0.5?'var(--success)':'var(--muted)';
-  const hasData=orig.totalValue>0||sim.total>0;
+  const orig = computeExposure();
+  const sim  = computeRBExposure();
+  const isRegions = rbExpTab === 'regions';
+  const simData  = isRegions ? sim.regions  : sim.sectors;
+  const origData = isRegions ? orig.regions : orig.sectors;
+  const colorMap = isRegions ? REGION_COLORS : SECTOR_COLORS;
 
-  if (rbViewMode === 'table') {
-    document.getElementById('rb-exp-sectors').innerHTML=hasData?rbExpRowsHTML(sim.sectors,orig.sectors,SECTOR_COLORS):'<div class="no-data" style="padding:12px 0">No data</div>';
-    document.getElementById('rb-exp-regions').innerHTML=hasData?rbExpRowsHTML(sim.regions,orig.regions,REGION_COLORS):'<div class="no-data" style="padding:12px 0">No data</div>';
-  } else {
-    // Chart mode — show simulated doughnut
-    if (hasData) {
-      document.getElementById('rb-exp-sectors').innerHTML=`<div class="rb-chart-wrap"><canvas id="rb-chart-sector"></canvas></div>`;
-      document.getElementById('rb-exp-regions').innerHTML=`<div class="rb-chart-wrap"><canvas id="rb-chart-region"></canvas></div>`;
-      rbSectorChart = renderRBChart('rb-chart-sector', sim.sectors, SECTOR_COLORS, rbSectorChart);
-      rbRegionChart = renderRBChart('rb-chart-region', sim.regions, REGION_COLORS, rbRegionChart);
-    } else {
-      document.getElementById('rb-exp-sectors').innerHTML='<div class="no-data" style="padding:12px 0">No data</div>';
-      document.getElementById('rb-exp-regions').innerHTML='<div class="no-data" style="padding:12px 0">No data</div>';
-    }
+  // Center value
+  document.getElementById('rb-center-val').textContent = fmt(sim.total);
+
+  // Doughnut chart
+  if (rbMainChart) { rbMainChart.destroy(); rbMainChart = null; }
+  const canvas = document.getElementById('rb-chart-main');
+  if (canvas && simData.length) {
+    const labels = simData.map(d=>d[0]);
+    const values = simData.map(d=>d[1]);
+    const colors = labels.map(l=>getColor(colorMap, l));
+    rbMainChart = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#0f1117', borderWidth: 3, hoverBorderWidth: 3 }] },
+      options: { cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+        const tot = values.reduce((a,b)=>a+b, 0);
+        return ` ${fmt(ctx.raw)} (${(ctx.raw/tot*100).toFixed(1)}%)`;
+      }}}}}
+    });
   }
+
+  // Table
+  document.getElementById('rb-exp-table').innerHTML = simData.length
+    ? rbTableHTML(simData, origData, colorMap)
+    : '<div class="no-data" style="padding:12px 0">No data yet</div>';
 }
 
 function rbCardHTML(p, isHypo) {
@@ -2236,9 +2085,8 @@ function renderRebalance() {
   const el=document.getElementById('rb-cards');
   if(!all.length){
     el.innerHTML='<div class="empty-state"><div class="icon">⚖️</div><h3>No positions yet</h3><p>Add positions to your portfolio first, then simulate rebalancing here.</p></div>';
-    document.getElementById('rb-total-val').textContent='—';
-    document.getElementById('rb-exp-sectors').innerHTML='';
-    document.getElementById('rb-exp-regions').innerHTML='';
+    document.getElementById('rb-center-val').textContent='—';
+    document.getElementById('rb-exp-table').innerHTML='';
     return;
   }
   el.innerHTML=[...positions.map(p=>rbCardHTML(p,false)),...rbHypo.map(p=>rbCardHTML(p,true))].join('');
@@ -2251,18 +2099,11 @@ document.querySelectorAll('.rb-exp-tab').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.rb-exp-tab').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active'); rbExpTab=btn.dataset.exp;
-    document.getElementById('rb-exp-sectors').style.display=rbExpTab==='sectors'?'':'none';
-    document.getElementById('rb-exp-regions').style.display=rbExpTab==='regions'?'':'none';
+    updateRBPreview();
   });
 });
 
 document.getElementById('rb-reset').addEventListener('click',()=>{ rbMultipliers={}; renderRebalance(); });
-
-document.getElementById('rb-view-toggle').addEventListener('click', () => {
-  rbViewMode = rbViewMode === 'table' ? 'chart' : 'table';
-  document.getElementById('rb-view-toggle').textContent = rbViewMode === 'table' ? '≡' : '◉';
-  updateRBPreview();
-});
 
 document.getElementById('rb-add-hypo').addEventListener('click',()=>{
   addingHypo=true;

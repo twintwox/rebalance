@@ -13,17 +13,11 @@ test('page loads with Portfolio tab active', async ({ page }) => {
   await expect(page.locator('.tab-btn[data-tab="portfolio"]')).toHaveClass(/active/);
 });
 
-test('can navigate to Sectors tab', async ({ page }) => {
-  await page.locator('.tab-btn[data-tab="sectors"]').click();
-  await expect(page.locator('#view-sectors')).toBeVisible();
+test('can navigate to Rebalance tab', async ({ page }) => {
+  await page.locator('.tab-btn[data-tab="rebalance"]').click();
+  await expect(page.locator('#view-rebalance')).toBeVisible();
   await expect(page.locator('#view-portfolio')).not.toBeVisible();
-  await expect(page.locator('.tab-btn[data-tab="sectors"]')).toHaveClass(/active/);
-});
-
-test('can navigate to Regions tab', async ({ page }) => {
-  await page.locator('.tab-btn[data-tab="regions"]').click();
-  await expect(page.locator('#view-regions')).toBeVisible();
-  await expect(page.locator('.tab-btn[data-tab="regions"]')).toHaveClass(/active/);
+  await expect(page.locator('.tab-btn[data-tab="rebalance"]')).toHaveClass(/active/);
 });
 
 test('can navigate to Settings tab', async ({ page }) => {
@@ -39,6 +33,13 @@ test('can exit Settings tab by tapping another tab', async ({ page }) => {
   await page.locator('.tab-btn[data-tab="portfolio"]').click();
   await expect(page.locator('#view-portfolio')).toBeVisible();
   await expect(page.locator('#view-settings')).not.toBeVisible();
+});
+
+test('nav has exactly 3 tabs', async ({ page }) => {
+  await expect(page.locator('.tab-btn')).toHaveCount(3);
+  await expect(page.locator('.tab-btn[data-tab="portfolio"]')).toBeVisible();
+  await expect(page.locator('.tab-btn[data-tab="rebalance"]')).toBeVisible();
+  await expect(page.locator('.tab-btn[data-tab="settings"]')).toBeVisible();
 });
 
 test('settings tab does not auto-open file picker', async ({ page }) => {
